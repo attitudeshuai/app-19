@@ -109,21 +109,24 @@ public class DailyCleanupScheduler : BackgroundService
         var todayUtcStart = todayLocal.ToUniversalTime();
         var tomorrowUtcStart = todayLocal.AddDays(1).ToUniversalTime();
 
-        var lastSuccessLog = await unitOfWork.ScheduledTaskLogs
+        var lastRunLog = await unitOfWork.ScheduledTaskLogs
             .GetQueryable()
-            .Where(log => log.TaskName == TaskName && log.Status == ScheduledTaskStatus.Success)
+            .Where(log => log.TaskName == TaskName
+                      && (log.Status == ScheduledTaskStatus.Success
+                          || log.Status == ScheduledTaskStatus.PartialSuccess))
             .OrderByDescending(log => log.StartedAt)
             .FirstOrDefaultAsync();
 
-        var lastSuccessDate = lastSuccessLog?.StartedAt.Date;
-        var hasRunSuccessfullyToday = lastSuccessDate.HasValue
-            && lastSuccessDate.Value >= todayUtcStart.Date
-            && lastSuccessDate.Value < tomorrowUtcStart.Date;
+        var lastRunDate = lastRunLog?.StartedAt.Date;
+        var hasRunToday = lastRunDate.HasValue
+            && lastRunDate.Value >= todayUtcStart.Date
+            && lastRunDate.Value < tomorrowUtcStart.Date;
 
-        if (hasRunSuccessfullyToday)
+        if (hasRunToday)
         {
-            _logger.LogDebug("今日已成功执行过清理任务（最近一次: {LastRun}），跳过",
-                lastSuccessLog!.StartedAt);
+            _logger.LogDebug(
+                "今日已执行过清理任务（最近一次: {LastRun}, 状态: {Status}），跳过以避免重复通知",
+                lastRunLog!.StartedAt, lastRunLog.Status);
             return false;
         }
 
@@ -131,16 +134,16 @@ public class DailyCleanupScheduler : BackgroundService
 
         if (isPastScheduledTime)
         {
-            if (lastSuccessLog != null)
+            if (lastRunLog != null)
             {
                 _logger.LogInformation(
-                    "检测到今日尚未执行（最近一次成功: {LastRun}），当前时间已过计划执行时间 {ScheduledTime}，触发补跑",
-                    lastSuccessLog.StartedAt, scheduledLocalTime);
+                    "检测到今日尚未执行（最近一次: {LastRun}, 状态: {Status}），当前时间已过计划执行时间 {ScheduledTime}，触发执行",
+                    lastRunLog.StartedAt, lastRunLog.Status, scheduledLocalTime);
             }
             else
             {
                 _logger.LogInformation(
-                    "未找到任何成功执行记录，当前时间已过计划执行时间 {ScheduledTime}，触发首次执行",
+                    "未找到任何成功/部分成功的执行记录，当前时间已过计划执行时间 {ScheduledTime}，触发首次执行",
                     scheduledLocalTime);
             }
         }

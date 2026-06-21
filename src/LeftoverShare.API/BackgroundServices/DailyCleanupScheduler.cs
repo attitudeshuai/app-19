@@ -4,6 +4,7 @@ using LeftoverShare.API.Entities.Enums;
 using LeftoverShare.API.Helpers;
 using LeftoverShare.API.Repositories;
 using LeftoverShare.API.Services;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -14,6 +15,7 @@ namespace LeftoverShare.API.BackgroundServices;
 /// <summary>
 /// 每日清理定时任务调度器
 /// 负责在固定时间点自动执行过期分享帖和超时取餐码的清理工作
+/// 从数据库任务日志读取上次成功执行时间，支持应用重启后的补跑
 /// </summary>
 public class DailyCleanupScheduler : BackgroundService
 {
@@ -23,7 +25,6 @@ public class DailyCleanupScheduler : BackgroundService
     private readonly DailyCleanupSettings _settings;
     private readonly ILogger<DailyCleanupScheduler> _logger;
 
-    private DateTime _lastRunDate = DateTime.MinValue;
     private readonly SemaphoreSlim _semaphore = new(1, 1);
 
     public DailyCleanupScheduler(
@@ -61,14 +62,13 @@ public class DailyCleanupScheduler : BackgroundService
         {
             try
             {
-                var now = DateTime.Now;
+                var now = DateTime.UtcNow;
 
-                if (ShouldRunNow(now))
+                if (await ShouldRunNowAsync(now))
                 {
-                    _logger.LogInformation("到达定时执行时间点，开始执行每日清理任务...");
+                    _logger.LogInformation("触发每日清理任务（定时到达或补跑），开始执行...");
                     await RunCleanupTaskAsync(stoppingToken);
-                    _lastRunDate = now.Date;
-                    _logger.LogInformation("今日清理任务已执行完成，下次执行时间: {NextRun}",
+                    _logger.LogInformation("清理任务执行流程结束，下次执行时间: {NextRun}",
                         CalculateNextRunTime(now));
                 }
 
@@ -93,38 +93,81 @@ public class DailyCleanupScheduler : BackgroundService
 
     /// <summary>
     /// 判断当前是否应该执行任务
+    /// 通过查询数据库任务日志表判断今天是否已经成功执行过
+    /// 支持补跑：只要今天已过计划执行时间且今天尚未成功执行，就触发执行
     /// </summary>
-    private bool ShouldRunNow(DateTime now)
+    private async Task<bool> ShouldRunNowAsync(DateTime utcNow)
+    {
+        using var scope = _serviceProvider.CreateScope();
+        var unitOfWork = scope.ServiceProvider.GetRequiredService<IUnitOfWork>();
+
+        var scheduledLocalTime = ParseScheduledTime();
+        var todayLocal = utcNow.ToLocalTime().Date;
+        var scheduledLocalToday = todayLocal.Add(scheduledLocalTime);
+        var scheduledUtcToday = scheduledLocalToday.ToUniversalTime();
+
+        var todayUtcStart = todayLocal.ToUniversalTime();
+        var tomorrowUtcStart = todayLocal.AddDays(1).ToUniversalTime();
+
+        var lastSuccessLog = await unitOfWork.ScheduledTaskLogs
+            .GetQueryable()
+            .Where(log => log.TaskName == TaskName && log.Status == ScheduledTaskStatus.Success)
+            .OrderByDescending(log => log.StartedAt)
+            .FirstOrDefaultAsync();
+
+        var lastSuccessDate = lastSuccessLog?.StartedAt.Date;
+        var hasRunSuccessfullyToday = lastSuccessDate.HasValue
+            && lastSuccessDate.Value >= todayUtcStart.Date
+            && lastSuccessDate.Value < tomorrowUtcStart.Date;
+
+        if (hasRunSuccessfullyToday)
+        {
+            _logger.LogDebug("今日已成功执行过清理任务（最近一次: {LastRun}），跳过",
+                lastSuccessLog!.StartedAt);
+            return false;
+        }
+
+        var isPastScheduledTime = utcNow >= scheduledUtcToday;
+
+        if (isPastScheduledTime)
+        {
+            if (lastSuccessLog != null)
+            {
+                _logger.LogInformation(
+                    "检测到今日尚未执行（最近一次成功: {LastRun}），当前时间已过计划执行时间 {ScheduledTime}，触发补跑",
+                    lastSuccessLog.StartedAt, scheduledLocalTime);
+            }
+            else
+            {
+                _logger.LogInformation(
+                    "未找到任何成功执行记录，当前时间已过计划执行时间 {ScheduledTime}，触发首次执行",
+                    scheduledLocalTime);
+            }
+        }
+
+        return isPastScheduledTime;
+    }
+
+    /// <summary>
+    /// 解析配置的计划执行时间（本地时间）
+    /// </summary>
+    private TimeSpan ParseScheduledTime()
     {
         if (!TimeSpan.TryParseExact(_settings.ExecuteTime, @"hh\:mm", null, out var scheduledTime))
         {
             _logger.LogWarning("执行时间格式错误: {ExecuteTime}，使用默认 02:00", _settings.ExecuteTime);
             scheduledTime = new TimeSpan(2, 0, 0);
         }
-
-        var currentTime = now.TimeOfDay;
-        var scheduledTimeWithBuffer = scheduledTime.Add(TimeSpan.FromMinutes(1));
-
-        if (_lastRunDate.Date == now.Date)
-        {
-            return false;
-        }
-
-        return currentTime >= scheduledTime && currentTime <= scheduledTimeWithBuffer;
+        return scheduledTime;
     }
 
     /// <summary>
     /// 计算距离下次检查的延迟时间
     /// </summary>
-    private TimeSpan CalculateDelayToNextCheck(DateTime now)
+    private TimeSpan CalculateDelayToNextCheck(DateTime utcNow)
     {
-        if (!TimeSpan.TryParseExact(_settings.ExecuteTime, @"hh\:mm", null, out var scheduledTime))
-        {
-            scheduledTime = new TimeSpan(2, 0, 0);
-        }
-
-        var nextRun = CalculateNextRunTime(now);
-        var timeUntilNextRun = nextRun - now;
+        var nextRun = CalculateNextRunTime(utcNow);
+        var timeUntilNextRun = nextRun - utcNow;
 
         if (timeUntilNextRun <= TimeSpan.Zero)
         {
@@ -145,17 +188,18 @@ public class DailyCleanupScheduler : BackgroundService
     }
 
     /// <summary>
-    /// 计算下次运行时间
+    /// 计算下次计划运行时间（UTC）
     /// </summary>
-    private DateTime CalculateNextRunTime(DateTime now)
+    private DateTime CalculateNextRunTime(DateTime utcNow)
     {
-        if (!TimeSpan.TryParseExact(_settings.ExecuteTime, @"hh\:mm", null, out var scheduledTime))
-        {
-            scheduledTime = new TimeSpan(2, 0, 0);
-        }
+        var scheduledLocalTime = ParseScheduledTime();
+        var localNow = utcNow.ToLocalTime();
+        var todayLocal = localNow.Date;
+        var scheduledLocalToday = todayLocal.Add(scheduledLocalTime);
 
-        var today = now.Date.Add(scheduledTime);
-        return now < today ? today : today.AddDays(1);
+        return localNow < scheduledLocalToday
+            ? scheduledLocalToday.ToUniversalTime()
+            : scheduledLocalToday.AddDays(1).ToUniversalTime();
     }
 
     /// <summary>

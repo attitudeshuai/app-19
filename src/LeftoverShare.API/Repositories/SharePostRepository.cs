@@ -53,4 +53,18 @@ public class SharePostRepository : Repository<SharePost>, ISharePostRepository
             .OrderByDescending(sp => sp.CreatedAt)
             .ToListAsync();
     }
+
+    // 获取所有已过期但未标记为 Expired 状态的分享帖
+    public async Task<IEnumerable<SharePost>> GetExpiredPostsAsync(DateTime now)
+    {
+        return await _dbSet
+            .Include(sp => sp.Poster)
+            .Include(sp => sp.Reservations)
+                .ThenInclude(r => r.Claimer)
+            .Where(sp => sp.AvailableUntil < now
+                      && sp.Status != Entities.Enums.SharePostStatus.Expired
+                      && sp.Status != Entities.Enums.SharePostStatus.Completed
+                      && sp.Status != Entities.Enums.SharePostStatus.PickedUp)
+            .ToListAsync();
+    }
 }

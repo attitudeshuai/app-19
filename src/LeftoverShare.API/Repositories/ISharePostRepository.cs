@@ -6,4 +6,5 @@ public interface ISharePostRepository : IRepository<SharePost>
 {
     Task<(IEnumerable<SharePost> Items, int TotalCount)> GetPagedWithDetailsAsync(int pageNumber, int pageSize);
     Task<IEnumerable<SharePost>> GetByUserIdAsync(int userId);
+    Task<IEnumerable<SharePost>> GetExpiredPostsAsync(DateTime now);
 }

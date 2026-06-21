@@ -7,5 +7,7 @@ public interface IUnitOfWork
     IReservationRepository Reservations { get; }
     IPickupCodeRepository PickupCodes { get; }
     IKarmaPointRepository KarmaPoints { get; }
+    INotificationRepository Notifications { get; }
+    IScheduledTaskLogRepository ScheduledTaskLogs { get; }
     Task<int> SaveChangesAsync();
 }

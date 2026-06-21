@@ -6,4 +6,5 @@ public interface IPickupCodeRepository : IRepository<PickupCode>
 {
     Task<PickupCode?> GetByReservationIdAsync(int reservationId);
     Task<PickupCode?> GetByCodeAsync(string code);
+    Task<IEnumerable<PickupCode>> GetUnusedExpiredCodesAsync(DateTime now, TimeSpan unusedThreshold);
 }

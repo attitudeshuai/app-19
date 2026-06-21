@@ -43,4 +43,20 @@ public class PickupCodeRepository : Repository<PickupCode>, IPickupCodeRepositor
             .OrderByDescending(pc => pc.ExpiresAt)
             .ToListAsync();
     }
+
+    // 获取超过指定期限仍未使用且未失效的取餐码
+    public async Task<IEnumerable<PickupCode>> GetUnusedExpiredCodesAsync(DateTime now, TimeSpan unusedThreshold)
+    {
+        var cutoffTime = now - unusedThreshold;
+        return await _dbSet
+            .Include(pc => pc.Reservation)
+                .ThenInclude(r => r.Post)
+                    .ThenInclude(p => p.Poster)
+            .Include(pc => pc.Reservation)
+                .ThenInclude(r => r.Claimer)
+            .Where(pc => !pc.IsUsed
+                      && !pc.IsExpired
+                      && pc.CreatedAt < cutoffTime)
+            .ToListAsync();
+    }
 }

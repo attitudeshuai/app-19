@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using LeftoverShare.API.Entities.Enums;
 
 namespace LeftoverShare.API.Entities;
 
@@ -49,6 +50,21 @@ public class PickupCode
     /// 使用时间
     /// </summary>
     public DateTime? UsedAt { get; set; }
+
+    /// <summary>
+    /// 是否已失效
+    /// </summary>
+    public bool IsExpired { get; set; } = false;
+
+    /// <summary>
+    /// 失效原因
+    /// </summary>
+    public ExpirationReason? ExpirationReason { get; set; }
+
+    /// <summary>
+    /// 失效操作时间
+    /// </summary>
+    public DateTime? ExpiredAt { get; set; }
 
     /// <summary>
     /// 创建时间

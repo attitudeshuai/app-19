@@ -21,6 +21,10 @@ public class AppDbContext : DbContext
     public DbSet<PickupCode> PickupCodes => Set<PickupCode>();
     // 积分表
     public DbSet<KarmaPoint> KarmaPoints => Set<KarmaPoint>();
+    // 站内通知表
+    public DbSet<Notification> Notifications => Set<Notification>();
+    // 定时任务日志表
+    public DbSet<ScheduledTaskLog> ScheduledTaskLogs => Set<ScheduledTaskLog>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -127,6 +131,10 @@ public class AppDbContext : DbContext
             entity.Property(sp => sp.Photos)
                   .HasMaxLength(2000);
 
+            entity.Property(sp => sp.ExpirationReason)
+                  .HasConversion<string>()
+                  .HasMaxLength(30);
+
             // 使用 MySQL 的 NOW() 函数作为默认值
             entity.Property(sp => sp.CreatedAt)
                   .HasColumnType("timestamp").HasDefaultValueSql("CURRENT_TIMESTAMP");
@@ -199,6 +207,13 @@ public class AppDbContext : DbContext
 
             entity.Property(pc => pc.IsUsed)
                   .HasDefaultValue(false);
+
+            entity.Property(pc => pc.IsExpired)
+                  .HasDefaultValue(false);
+
+            entity.Property(pc => pc.ExpirationReason)
+                  .HasConversion<string>()
+                  .HasMaxLength(30);
         });
 
         // ===== 积分实体配置 =====
@@ -220,6 +235,91 @@ public class AppDbContext : DbContext
             // 使用 MySQL 的 NOW() 函数作为默认值
             entity.Property(kp => kp.CreatedAt)
                   .HasColumnType("timestamp").HasDefaultValueSql("CURRENT_TIMESTAMP");
+        });
+
+        // ===== 站内通知实体配置 =====
+        modelBuilder.Entity<Notification>(entity =>
+        {
+            entity.HasKey(n => n.Id);
+
+            entity.HasIndex(n => new { n.UserId, n.IsRead, n.CreatedAt })
+                  .HasDatabaseName("IX_Notifications_UserId_IsRead_CreatedAt");
+
+            entity.HasIndex(n => new { n.Type, n.CreatedAt })
+                  .HasDatabaseName("IX_Notifications_Type_CreatedAt");
+
+            entity.Property(n => n.Title)
+                  .IsRequired()
+                  .HasMaxLength(200);
+
+            entity.Property(n => n.Content)
+                  .IsRequired()
+                  .HasMaxLength(2000);
+
+            entity.Property(n => n.Type)
+                  .IsRequired()
+                  .HasConversion<string>()
+                  .HasMaxLength(30);
+
+            entity.Property(n => n.IsRead)
+                  .HasDefaultValue(false);
+
+            entity.Property(n => n.CreatedAt)
+                  .HasColumnType("timestamp").HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            entity.HasOne(n => n.User)
+                  .WithMany()
+                  .HasForeignKey(n => n.UserId)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(n => n.SharePost)
+                  .WithMany()
+                  .HasForeignKey(n => n.SharePostId)
+                  .OnDelete(DeleteBehavior.SetNull);
+
+            entity.HasOne(n => n.Reservation)
+                  .WithMany()
+                  .HasForeignKey(n => n.ReservationId)
+                  .OnDelete(DeleteBehavior.SetNull);
+        });
+
+        // ===== 定时任务执行日志实体配置 =====
+        modelBuilder.Entity<ScheduledTaskLog>(entity =>
+        {
+            entity.HasKey(stl => stl.Id);
+
+            entity.HasIndex(stl => new { stl.TaskName, stl.StartedAt })
+                  .HasDatabaseName("IX_ScheduledTaskLogs_TaskName_StartedAt");
+
+            entity.HasIndex(stl => new { stl.Status, stl.StartedAt })
+                  .HasDatabaseName("IX_ScheduledTaskLogs_Status_StartedAt");
+
+            entity.Property(stl => stl.TaskName)
+                  .IsRequired()
+                  .HasMaxLength(100);
+
+            entity.Property(stl => stl.Status)
+                  .IsRequired()
+                  .HasConversion<string>()
+                  .HasMaxLength(20);
+
+            entity.Property(stl => stl.ExpiredSharePostsCount)
+                  .HasDefaultValue(0);
+
+            entity.Property(stl => stl.ExpiredPickupCodesCount)
+                  .HasDefaultValue(0);
+
+            entity.Property(stl => stl.NotificationsSentCount)
+                  .HasDefaultValue(0);
+
+            entity.Property(stl => stl.StartedAt)
+                  .HasColumnType("timestamp").HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            entity.Property(stl => stl.ErrorMessage)
+                  .HasMaxLength(4000);
+
+            entity.Property(stl => stl.Details)
+                  .HasMaxLength(8000);
         });
     }
 }

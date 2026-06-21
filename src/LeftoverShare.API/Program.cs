@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Text;
 using FluentValidation;
 using FluentValidation.AspNetCore;
+using LeftoverShare.API.BackgroundServices;
 using LeftoverShare.API.Data;
 using LeftoverShare.API.Helpers;
 using LeftoverShare.API.Mappings;
@@ -154,6 +155,8 @@ builder.Services.AddScoped<ISharePostRepository, SharePostRepository>();
 builder.Services.AddScoped<IReservationRepository, ReservationRepository>();
 builder.Services.AddScoped<IPickupCodeRepository, PickupCodeRepository>();
 builder.Services.AddScoped<IKarmaPointRepository, KarmaPointRepository>();
+builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
+builder.Services.AddScoped<IScheduledTaskLogRepository, ScheduledTaskLogRepository>();
 
 // 注册 UnitOfWork
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
@@ -165,6 +168,11 @@ builder.Services.AddScoped<IReservationService, ReservationService>();
 builder.Services.AddScoped<IPickupCodeService, PickupCodeService>();
 builder.Services.AddScoped<IKarmaPointService, KarmaPointService>();
 builder.Services.AddScoped<IStatsService, StatsService>();
+builder.Services.AddScoped<INotificationService, NotificationService>();
+builder.Services.AddScoped<IExpirationProcessingService, ExpirationProcessingService>();
+
+// 注册定时任务后台服务
+builder.Services.AddHostedService<DailyCleanupScheduler>();
 
 // 添加控制器支持
 builder.Services.AddControllers();

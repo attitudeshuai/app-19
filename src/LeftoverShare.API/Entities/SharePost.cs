@@ -98,6 +98,16 @@ public class SharePost
     public DateTime CreatedAt { get; set; }
 
     /// <summary>
+    /// 失效原因
+    /// </summary>
+    public ExpirationReason? ExpirationReason { get; set; }
+
+    /// <summary>
+    /// 失效操作时间
+    /// </summary>
+    public DateTime? ExpiredAt { get; set; }
+
+    /// <summary>
     /// 预订记录
     /// </summary>
     public virtual ICollection<Reservation> Reservations { get; set; } = new List<Reservation>();

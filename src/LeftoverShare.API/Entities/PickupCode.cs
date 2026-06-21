@@ -1,0 +1,57 @@
+using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations.Schema;
+
+namespace LeftoverShare.API.Entities;
+
+/// <summary>
+/// 取餐码实体
+/// </summary>
+public class PickupCode
+{
+    /// <summary>
+    /// 取餐码ID
+    /// </summary>
+    [Key]
+    [DatabaseGenerated(DatabaseGeneratedOption.Identity)]
+    public int Id { get; set; }
+
+    /// <summary>
+    /// 预订ID
+    /// </summary>
+    [Required]
+    [ForeignKey(nameof(Reservation))]
+    public int ReservationId { get; set; }
+
+    /// <summary>
+    /// 预订记录
+    /// </summary>
+    public virtual Reservation Reservation { get; set; } = null!;
+
+    /// <summary>
+    /// 取餐码
+    /// </summary>
+    [Required]
+    [MaxLength(10)]
+    public string Code { get; set; } = string.Empty;
+
+    /// <summary>
+    /// 过期时间
+    /// </summary>
+    [Required]
+    public DateTime ExpiresAt { get; set; }
+
+    /// <summary>
+    /// 是否已使用
+    /// </summary>
+    public bool IsUsed { get; set; } = false;
+
+    /// <summary>
+    /// 使用时间
+    /// </summary>
+    public DateTime? UsedAt { get; set; }
+
+    /// <summary>
+    /// 创建时间
+    /// </summary>
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+}

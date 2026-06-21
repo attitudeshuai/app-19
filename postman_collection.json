@@ -1,0 +1,1873 @@
+﻿﻿﻿﻿﻿﻿{
+  "info": {
+    "name": "LeftoverShare API Test Collection",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "LeftoverShare 鍓╀綑椋熺墿鍒嗕韩骞冲彴 API 瀹屾暣娴嬭瘯闆嗗悎锛屽寘鍚璇併€佸垎浜笘銆侀绾︺€佸彇椁愮爜銆佺Н鍒嗗拰缁熻绛夋墍鏈夋帴鍙ｇ殑娴嬭瘯鐢ㄤ緥"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000",
+      "type": "string",
+      "description": "API 鍩虹鍦板潃"
+    },
+    {
+      "key": "authToken",
+      "value": "",
+      "type": "string",
+      "description": "JWT 璁よ瘉浠ょ墝锛堢櫥褰曞悗鑷姩璁剧疆锛?
+    },
+    {
+      "key": "testUsername",
+      "value": "testuser",
+      "type": "string",
+      "description": "娴嬭瘯鐢ㄦ埛鍚?
+    },
+    {
+      "key": "testPassword",
+      "value": "Test@123456",
+      "type": "string",
+      "description": "娴嬭瘯瀵嗙爜"
+    },
+    {
+      "key": "testEmail",
+      "value": "test@example.com",
+      "type": "string",
+      "description": "娴嬭瘯閭"
+    },
+    {
+      "key": "createdPostId",
+      "value": "",
+      "type": "string",
+      "description": "鍒涘缓鐨勫垎浜笘ID锛堝垱寤哄悗鑷姩璁剧疆锛?
+    },
+    {
+      "key": "createdReservationId",
+      "value": "",
+      "type": "string",
+      "description": "鍒涘缓鐨勯绾D锛堝垱寤哄悗鑷姩璁剧疆锛?
+    },
+    {
+      "key": "createdPickupCodeId",
+      "value": "",
+      "type": "string",
+      "description": "鍒涘缓鐨勫彇椁愮爜ID锛堝垱寤哄悗鑷姩璁剧疆锛?
+    },
+    {
+      "key": "createdKarmaPointId",
+      "value": "",
+      "type": "string",
+      "description": "鍒涘缓鐨勭Н鍒嗚褰旾D锛堝垱寤哄悗鑷姩璁剧疆锛?
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "pm.request.headers.add({",
+          "    key: 'Content-Type',",
+          "    value: 'application/json'",
+          "});",
+          "",
+          "var authToken = pm.variables.get('authToken');",
+          "if (authToken && authToken !== '') {",
+          "    pm.request.headers.add({",
+          "        key: 'Authorization',",
+          "        value: 'Bearer ' + authToken",
+          "    });",
+          "}"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "Auth - 璁よ瘉鎺ュ彛",
+      "description": "鐢ㄦ埛璁よ瘉鐩稿叧鎺ュ彛锛氭敞鍐屻€佺櫥褰曘€佽幏鍙栧綋鍓嶇敤鎴蜂俊鎭€佹洿鏂颁釜浜鸿祫鏂?,
+      "item": [
+        {
+          "name": "Register - 鐢ㄦ埛娉ㄥ唽",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('响应状态码为 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('响应格式为 JSON', function () {",
+                  "    pm.response.to.be.json;",
+                  "});",
+                  "",
+                  "pm.test('鍝嶅簲鍖呭惈 code銆乵essage銆乨ata 瀛楁', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData).to.have.property('code');",
+                  "    pm.expect(jsonData).to.have.property('message');",
+                  "    pm.expect(jsonData).to.have.property('data');",
+                  "});",
+                  "",
+                  "pm.test('娉ㄥ唽鎴愬姛锛宑ode 涓?200', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.code).to.eql(200);",
+                  "});",
+                  "",
+                  "pm.test('鍝嶅簲鍖呭惈鐢ㄦ埛淇℃伅鍜屼护鐗?, function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    if (jsonData.data) {",
+                  "        pm.expect(jsonData.data).to.have.property('User');",
+                  "        pm.expect(jsonData.data).to.have.property('Token');",
+                  "    }",
+                  "});",
+                  "",
+                  "pm.test('淇濆瓨璁よ瘉浠ょ墝鍒板彉閲?, function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    if (jsonData.data && jsonData.data.Token) {",
+                  "        pm.variables.set('authToken', jsonData.data.Token);",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\": \"{{testUsername}}\",\n    \"email\": \"{{testEmail}}\",\n    \"password\": \"{{testPassword}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "Register - 鐢ㄦ埛鍚嶅凡瀛樺湪锛堟潈闄愭祴璇曪級",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('响应状态码为 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('响应格式为 JSON', function () {",
+                  "    pm.response.to.be.json;",
+                  "});",
+                  "",
+                  "pm.test('娉ㄥ唽澶辫触锛岃繑鍥為敊璇俊鎭?, function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.code).to.not.eql(200);",
+                  "    pm.expect(jsonData.message).to.include('宸插瓨鍦?);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\": \"{{testUsername}}\",\n    \"email\": \"another@example.com\",\n    \"password\": \"{{testPassword}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "register"]
+            }
+          }
+        },
+        {
+          "name": "Login - 鐢ㄦ埛鐧诲綍",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('响应状态码为 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('响应格式为 JSON', function () {",
+                  "    pm.response.to.be.json;",
+                  "});",
+                  "",
+                  "pm.test('鐧诲綍鎴愬姛锛宑ode 涓?200', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.code).to.eql(200);",
+                  "});",
+                  "",
+                  "pm.test('鍝嶅簲鍖呭惈鐢ㄦ埛淇℃伅鍜屼护鐗?, function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data).to.have.property('User');",
+                  "    pm.expect(jsonData.data).to.have.property('Token');",
+                  "    pm.expect(jsonData.data.Token).to.be.a('string');",
+                  "    pm.expect(jsonData.data.Token).to.not.be.empty;",
+                  "});",
+                  "",
+                  "pm.test('淇濆瓨璁よ瘉浠ょ墝鍒板彉閲?, function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.variables.set('authToken', jsonData.data.Token);",
+                  "});",
+                  "",
+                  "pm.test('鐢ㄦ埛淇℃伅鍖呭惈蹇呰瀛楁', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    var user = jsonData.data.User;",
+                  "    pm.expect(user).to.have.property('id');",
+                  "    pm.expect(user).to.have.property('username');",
+                  "    pm.expect(user).to.have.property('email');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"usernameOrEmail\": \"{{testUsername}}\",\n    \"password\": \"{{testPassword}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Login - 瀵嗙爜閿欒锛堟潈闄愭祴璇曪級",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('响应状态码为 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('响应格式为 JSON', function () {",
+                  "    pm.response.to.be.json;",
+                  "});",
+                  "",
+                  "pm.test('鐧诲綍澶辫触锛岃繑鍥為敊璇俊鎭?, function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.code).to.not.eql(200);",
+                  "    pm.expect(jsonData.message).to.include('鐢ㄦ埛鍚嶆垨瀵嗙爜閿欒');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"usernameOrEmail\": \"{{testUsername}}\",\n    \"password\": \"wrongpassword\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            }
+          }
+        },
+        {
+          "name": "Get Current User - 鑾峰彇褰撳墠鐢ㄦ埛淇℃伅",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('响应状态码为 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('响应格式为 JSON', function () {",
+                  "    pm.response.to.be.json;",
+                  "});",
+                  "",
+                  "pm.test('获取成功，code 为 200', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.code).to.eql(200);",
+                  "});",
+                  "",
+                  "pm.test('鐢ㄦ埛淇℃伅鍖呭惈蹇呰瀛楁', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    var user = jsonData.data;",
+                  "    pm.expect(user).to.have.property('id');",
+                  "    pm.expect(user).to.have.property('username');",
+                  "    pm.expect(user).to.have.property('email');",
+                  "    pm.expect(user).to.have.property('totalKarmaPoints');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "me"]
+            }
+          }
+        },
+        {
+          "name": "Get Current User - 未登录（权限测试）",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "pm.request.headers.remove('Authorization');"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('未登录返回 401 未授权', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "me"]
+            }
+          }
+        },
+        {
+          "name": "Update Profile - 鏇存柊鐢ㄦ埛璧勬枡",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('响应状态码为 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('响应格式为 JSON', function () {",
+                  "    pm.response.to.be.json;",
+                  "});",
+                  "",
+                  "pm.test('更新成功，code 为 200', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.code).to.eql(200);",
+                  "});",
+                  "",
+                  "pm.test('鐢ㄦ埛淇℃伅宸叉洿鏂?, function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    var user = jsonData.data;",
+                  "    pm.expect(user.username).to.eql('updateduser');",
+                  "    pm.expect(user.email).to.eql('updated@example.com');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"username\": \"updateduser\",\n    \"email\": \"updated@example.com\",\n    \"avatar\": \"https://example.com/avatar.jpg\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "me"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "SharePosts - 鍒嗕韩甯栨帴鍙?,
+      "description": "鍒嗕韩甯栫浉鍏虫帴鍙ｏ細鑾峰彇鍒楄〃銆佸垱寤恒€佽幏鍙栬鎯呫€佹洿鏂般€佸垹闄ゃ€佹洿鏂扮姸鎬?,
+      "item": [
+        {
+          "name": "Get List - 鑾峰彇鍒嗕韩甯栧垪琛?,
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('响应状态码为 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('响应格式为 JSON', function () {",
+                  "    pm.response.to.be.json;",
+                  "});",
+                  "",
+                  "pm.test('获取成功，code 为 200', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.code).to.eql(200);",
+                  "});",
+                  "",
+                  "pm.test('返回分页数据结构', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    var data = jsonData.data;",
+                  "    pm.expect(data).to.have.property('items');",
+                  "    pm.expect(data).to.have.property('totalCount');",
+                  "    pm.expect(data).to.have.property('pageNumber');",
+                  "    pm.expect(data).to.have.property('pageSize');",
+                  "    pm.expect(data).to.have.property('totalPages');",
+                  "});",
+                  "",
+                  "pm.test('鍒嗛〉鍙傛暟姝ｇ‘', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    var data = jsonData.data;",
+                  "    pm.expect(data.pageNumber).to.eql(1);",
+                  "    pm.expect(data.pageSize).to.eql(10);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/shareposts?pageNumber=1&pageSize=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "shareposts"],
+              "query": [
+                { "key": "pageNumber", "value": "1" },
+                { "key": "pageSize", "value": "10" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create - 鍒涘缓鍒嗕韩甯?,
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('响应状态码为 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('响应格式为 JSON', function () {",
+                  "    pm.response.to.be.json;",
+                  "});",
+                  "",
+                  "pm.test('创建成功，code 为 200', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.code).to.eql(200);",
+                  "});",
+                  "",
+                  "pm.test('杩斿洖鍒涘缓鐨勫垎浜笘淇℃伅', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    var post = jsonData.data;",
+                  "    pm.expect(post).to.have.property('id');",
+                  "    pm.expect(post).to.have.property('title');",
+                  "    pm.expect(post).to.have.property('foodType');",
+                  "    pm.expect(post).to.have.property('quantity');",
+                  "    pm.expect(post).to.have.property('location');",
+                  "    pm.expect(post).to.have.property('status');",
+                  "    pm.expect(post.status).to.eql('Available');",
+                  "});",
+                  "",
+                  "pm.test('淇濆瓨鍒嗕韩甯朓D鍒板彉閲?, function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    if (jsonData.data && jsonData.data.id) {",
+                  "        pm.variables.set('createdPostId', jsonData.data.id);",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"title\": \"娴嬭瘯鍒嗕韩甯?- 瀹跺父鑿淺",\n    \"description\": \"浠婂ぉ鍋氫簡澶瀹跺父鑿滐紝鍚冧笉瀹屽垎浜粰澶у\",\n    \"foodType\": \"涓\",\n    \"quantity\": 2,\n    \"location\": \"鍖椾含甯傛湞闃冲尯\",\n    \"latitude\": 39.9042,\n    \"longitude\": 116.4074,\n    \"expiryTime\": \"2024-12-31T23:59:59Z\",\n    \"photos\": [\"https://example.com/photo1.jpg\"]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/shareposts",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "shareposts"]
+            }
+          }
+        },
+        {
+          "name": "Create - 未登录（权限测试）",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "pm.request.headers.remove('Authorization');"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('未登录返回 401 未授权', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"title\": \"娴嬭瘯鍒嗕韩甯朶",\n    \"foodType\": \"涓\",\n    \"quantity\": 1,\n    \"location\": \"鍖椾含甯俓"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/shareposts",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "shareposts"]
+            }
+          }
+        },
+        {
+          "name": "Get By Id - 鑾峰彇鍒嗕韩甯栬鎯?,
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('响应状态码为 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('响应格式为 JSON', function () {",
+                  "    pm.response.to.be.json;",
+                  "});",
+                  "",
+                  "pm.test('获取成功，code 为 200', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.code).to.eql(200);",
+                  "});",
+                  "",
+                  "pm.test('杩斿洖瀹屾暣鐨勫垎浜笘淇℃伅', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    var post = jsonData.data;",
+                  "    pm.expect(post).to.have.property('id');",
+                  "    pm.expect(post).to.have.property('title');",
+                  "    pm.expect(post).to.have.property('description');",
+                  "    pm.expect(post).to.have.property('foodType');",
+                  "    pm.expect(post).to.have.property('quantity');",
+                  "    pm.expect(post).to.have.property('location');",
+                  "    pm.expect(post).to.have.property('status');",
+                  "    pm.expect(post).to.have.property('userId');",
+                  "    pm.expect(post).to.have.property('createdAt');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/shareposts/{{createdPostId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "shareposts", "{{createdPostId}}"]
+            }
+          }
+        },
+        {
+          "name": "Get By Id - 涓嶅瓨鍦ㄧ殑ID",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('响应状态码为 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('杩斿洖404閿欒鐮?, function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.code).to.eql(404);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/shareposts/99999",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "shareposts", "99999"]
+            }
+          }
+        },
+        {
+          "name": "Update - 鏇存柊鍒嗕韩甯?,
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('响应状态码为 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('响应格式为 JSON', function () {",
+                  "    pm.response.to.be.json;",
+                  "});",
+                  "",
+                  "pm.test('更新成功，code 为 200', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.code).to.eql(200);",
+                  "});",
+                  "",
+                  "pm.test('鍒嗕韩甯栦俊鎭凡鏇存柊', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    var post = jsonData.data;",
+                  "    pm.expect(post.title).to.eql('鏇存柊鍚庣殑鍒嗕韩甯?);",
+                  "    pm.expect(post.description).to.eql('鏇存柊鍚庣殑鎻忚堪');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"title\": \"鏇存柊鍚庣殑鍒嗕韩甯朶",\n    \"description\": \"鏇存柊鍚庣殑鎻忚堪\",\n    \"foodType\": \"瑗块\",\n    \"quantity\": 3,\n    \"location\": \"鍖椾含甯傛捣娣€鍖篭",\n    \"latitude\": 39.9842,\n    \"longitude\": 116.3074\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/shareposts/{{createdPostId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "shareposts", "{{createdPostId}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Status - 鏇存柊鍒嗕韩甯栫姸鎬?,
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('响应状态码为 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('响应格式为 JSON', function () {",
+                  "    pm.response.to.be.json;",
+                  "});",
+                  "",
+                  "pm.test('鐘舵€佹洿鏂版垚鍔燂紝code 涓?200', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.code).to.eql(200);",
+                  "});",
+                  "",
+                  "pm.test('鍒嗕韩甯栫姸鎬佸凡鏇存柊', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    var post = jsonData.data;",
+                  "    pm.expect(post.status).to.eql('Reserved');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"status\": \"Reserved\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/shareposts/{{createdPostId}}/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "shareposts", "{{createdPostId}}", "status"]
+            }
+          }
+        },
+        {
+          "name": "Update Status - 鏃犳晥鐘舵€佸€?,
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('响应状态码为 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('杩斿洖400閿欒鐮?, function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.code).to.eql(400);",
+                  "});",
+                  "",
+                  "pm.test('杩斿洖閿欒淇℃伅', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.message).to.include('鏃犳晥鐨勭姸鎬佸€?);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"status\": \"InvalidStatus\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/shareposts/{{createdPostId}}/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "shareposts", "{{createdPostId}}", "status"]
+            }
+          }
+        },
+        {
+          "name": "Delete - 鍒犻櫎鍒嗕韩甯?,
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('响应状态码为 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('响应格式为 JSON', function () {",
+                  "    pm.response.to.be.json;",
+                  "});",
+                  "",
+                  "pm.test('删除成功，code 为 200', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.code).to.eql(200);",
+                  "});",
+                  "",
+                  "pm.test('返回成功消息', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.message).to.include('已删除');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/shareposts/{{createdPostId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "shareposts", "{{createdPostId}}"]
+            }
+          }
+        },
+        {
+          "name": "Delete - 未登录（权限测试）",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "pm.request.headers.remove('Authorization');"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('未登录返回 401 未授权', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/shareposts/{{createdPostId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "shareposts", "{{createdPostId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Reservations - 棰勭害鎺ュ彛",
+      "description": "棰勭害鐩稿叧鎺ュ彛锛氳幏鍙栧垪琛ㄣ€佸垱寤恒€佽幏鍙栬鎯呫€佹洿鏂般€佸垹闄ゃ€佹洿鏂扮姸鎬?,
+      "item": [
+        {
+          "name": "Get List - 鑾峰彇棰勭害鍒楄〃",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('响应状态码为 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('响应格式为 JSON', function () {",
+                  "    pm.response.to.be.json;",
+                  "});",
+                  "",
+                  "pm.test('获取成功，code 为 200', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.code).to.eql(200);",
+                  "});",
+                  "",
+                  "pm.test('返回分页数据结构', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    var data = jsonData.data;",
+                  "    pm.expect(data).to.have.property('items');",
+                  "    pm.expect(data).to.have.property('totalCount');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/reservations?pageNumber=1&pageSize=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "reservations"],
+              "query": [
+                { "key": "pageNumber", "value": "1" },
+                { "key": "pageSize", "value": "10" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get List - 未登录（权限测试）",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "pm.request.headers.remove('Authorization');"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('未登录返回 401 未授权', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/reservations?pageNumber=1&pageSize=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "reservations"],
+              "query": [
+                { "key": "pageNumber", "value": "1" },
+                { "key": "pageSize", "value": "10" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create - 鍒涘缓棰勭害",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('响应状态码为 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('响应格式为 JSON', function () {",
+                  "    pm.response.to.be.json;",
+                  "});",
+                  "",
+                  "pm.test('创建成功，code 为 200', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.code).to.eql(200);",
+                  "});",
+                  "",
+                  "pm.test('杩斿洖鍒涘缓鐨勯绾︿俊鎭?, function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    var reservation = jsonData.data;",
+                  "    pm.expect(reservation).to.have.property('id');",
+                  "    pm.expect(reservation).to.have.property('sharePostId');",
+                  "    pm.expect(reservation).to.have.property('quantity');",
+                  "    pm.expect(reservation).to.have.property('status');",
+                  "    pm.expect(reservation.status).to.eql('Pending');",
+                  "});",
+                  "",
+                  "pm.test('淇濆瓨棰勭害ID鍒板彉閲?, function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    if (jsonData.data && jsonData.data.id) {",
+                  "        pm.variables.set('createdReservationId', jsonData.data.id);",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"sharePostId\": 1,\n    \"quantity\": 1,\n    \"note\": \"璇峰湪涓嬪崍6鐐瑰墠鍑嗗濂絓"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/reservations",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "reservations"]
+            }
+          }
+        },
+        {
+          "name": "Get By Id - 鑾峰彇棰勭害璇︽儏",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('响应状态码为 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('响应格式为 JSON', function () {",
+                  "    pm.response.to.be.json;",
+                  "});",
+                  "",
+                  "pm.test('获取成功，code 为 200', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.code).to.eql(200);",
+                  "});",
+                  "",
+                  "pm.test('杩斿洖瀹屾暣鐨勯绾︿俊鎭?, function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    var reservation = jsonData.data;",
+                  "    pm.expect(reservation).to.have.property('id');",
+                  "    pm.expect(reservation).to.have.property('sharePostId');",
+                  "    pm.expect(reservation).to.have.property('userId');",
+                  "    pm.expect(reservation).to.have.property('quantity');",
+                  "    pm.expect(reservation).to.have.property('status');",
+                  "    pm.expect(reservation).to.have.property('createdAt');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/reservations/{{createdReservationId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "reservations", "{{createdReservationId}}"]
+            }
+          }
+        },
+        {
+          "name": "Update - 鏇存柊棰勭害",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('响应状态码为 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('响应格式为 JSON', function () {",
+                  "    pm.response.to.be.json;",
+                  "});",
+                  "",
+                  "pm.test('更新成功，code 为 200', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.code).to.eql(200);",
+                  "});",
+                  "",
+                  "pm.test('棰勭害淇℃伅宸叉洿鏂?, function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    var reservation = jsonData.data;",
+                  "    pm.expect(reservation.note).to.eql('鏇存柊鍚庣殑澶囨敞');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"note\": \"鏇存柊鍚庣殑澶囨敞\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/reservations/{{createdReservationId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "reservations", "{{createdReservationId}}"]
+            }
+          }
+        },
+        {
+          "name": "Update Status - 鏇存柊棰勭害鐘舵€?,
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('响应状态码为 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('响应格式为 JSON', function () {",
+                  "    pm.response.to.be.json;",
+                  "});",
+                  "",
+                  "pm.test('鐘舵€佹洿鏂版垚鍔燂紝code 涓?200', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.code).to.eql(200);",
+                  "});",
+                  "",
+                  "pm.test('棰勭害鐘舵€佸凡鏇存柊', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    var reservation = jsonData.data;",
+                  "    pm.expect(reservation.status).to.eql('Confirmed');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PATCH",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"status\": \"Confirmed\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/reservations/{{createdReservationId}}/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "reservations", "{{createdReservationId}}", "status"]
+            }
+          }
+        },
+        {
+          "name": "Delete - 鍒犻櫎锛堝彇娑堬級棰勭害",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('响应状态码为 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('响应格式为 JSON', function () {",
+                  "    pm.response.to.be.json;",
+                  "});",
+                  "",
+                  "pm.test('鍙栨秷鎴愬姛锛宑ode 涓?200', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.code).to.eql(200);",
+                  "});",
+                  "",
+                  "pm.test('返回成功消息', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.message).to.include('宸插彇娑?);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/reservations/{{createdReservationId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "reservations", "{{createdReservationId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "PickupCodes - 鍙栭鐮佹帴鍙?,
+      "description": "鍙栭鐮佺浉鍏虫帴鍙ｏ細鑾峰彇鍒楄〃銆佸垱寤恒€佽幏鍙栬鎯呫€佸垹闄?,
+      "item": [
+        {
+          "name": "Get List - 鑾峰彇鍙栭鐮佸垪琛?,
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('响应状态码为 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('响应格式为 JSON', function () {",
+                  "    pm.response.to.be.json;",
+                  "});",
+                  "",
+                  "pm.test('获取成功，code 为 200', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.code).to.eql(200);",
+                  "});",
+                  "",
+                  "pm.test('返回分页数据结构', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    var data = jsonData.data;",
+                  "    pm.expect(data).to.have.property('items');",
+                  "    pm.expect(data).to.have.property('totalCount');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/pickupcodes?pageNumber=1&pageSize=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "pickupcodes"],
+              "query": [
+                { "key": "pageNumber", "value": "1" },
+                { "key": "pageSize", "value": "10" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get List - 未登录（权限测试）",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "pm.request.headers.remove('Authorization');"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('未登录返回 401 未授权', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/pickupcodes?pageNumber=1&pageSize=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "pickupcodes"],
+              "query": [
+                { "key": "pageNumber", "value": "1" },
+                { "key": "pageSize", "value": "10" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create - 鍒涘缓鍙栭鐮?,
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('响应状态码为 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('响应格式为 JSON', function () {",
+                  "    pm.response.to.be.json;",
+                  "});",
+                  "",
+                  "pm.test('创建成功，code 为 200', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.code).to.eql(200);",
+                  "});",
+                  "",
+                  "pm.test('杩斿洖鍒涘缓鐨勫彇椁愮爜淇℃伅', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    var pickupCode = jsonData.data;",
+                  "    pm.expect(pickupCode).to.have.property('id');",
+                  "    pm.expect(pickupCode).to.have.property('code');",
+                  "    pm.expect(pickupCode).to.have.property('reservationId');",
+                  "    pm.expect(pickupCode.code).to.match(/^\\d{6}$/);",
+                  "});",
+                  "",
+                  "pm.test('淇濆瓨鍙栭鐮両D鍒板彉閲?, function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    if (jsonData.data && jsonData.data.id) {",
+                  "        pm.variables.set('createdPickupCodeId', jsonData.data.id);",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"reservationId\": 1,\n    \"expiryTime\": \"2024-12-31T23:59:59Z\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/pickupcodes",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "pickupcodes"]
+            }
+          }
+        },
+        {
+          "name": "Get By Id - 鑾峰彇鍙栭鐮佽鎯?,
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('响应状态码为 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('响应格式为 JSON', function () {",
+                  "    pm.response.to.be.json;",
+                  "});",
+                  "",
+                  "pm.test('获取成功，code 为 200', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.code).to.eql(200);",
+                  "});",
+                  "",
+                  "pm.test('杩斿洖瀹屾暣鐨勫彇椁愮爜淇℃伅', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    var pickupCode = jsonData.data;",
+                  "    pm.expect(pickupCode).to.have.property('id');",
+                  "    pm.expect(pickupCode).to.have.property('code');",
+                  "    pm.expect(pickupCode).to.have.property('reservationId');",
+                  "    pm.expect(pickupCode).to.have.property('isUsed');",
+                  "    pm.expect(pickupCode).to.have.property('expiryTime');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/pickupcodes/{{createdPickupCodeId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "pickupcodes", "{{createdPickupCodeId}}"]
+            }
+          }
+        },
+        {
+          "name": "Delete - 删除取餐码",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('响应状态码为 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('响应格式为 JSON', function () {",
+                  "    pm.response.to.be.json;",
+                  "});",
+                  "",
+                  "pm.test('删除成功，code 为 200', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.code).to.eql(200);",
+                  "});",
+                  "",
+                  "pm.test('返回成功消息', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.message).to.include('已删除');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/pickupcodes/{{createdPickupCodeId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "pickupcodes", "{{createdPickupCodeId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "KarmaPoints - 积分接口",
+      "description": "积分相关接口：获取列表、创建、获取详情、更新、删除、获取我的积分",
+      "item": [
+        {
+          "name": "Get List - 获取积分记录列表",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('响应状态码为 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('响应格式为 JSON', function () {",
+                  "    pm.response.to.be.json;",
+                  "});",
+                  "",
+                  "pm.test('获取成功，code 为 200', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.code).to.eql(200);",
+                  "});",
+                  "",
+                  "pm.test('返回分页数据结构', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    var data = jsonData.data;",
+                  "    pm.expect(data).to.have.property('items');",
+                  "    pm.expect(data).to.have.property('totalCount');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/karmapoints?pageNumber=1&pageSize=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "karmapoints"],
+              "query": [
+                { "key": "pageNumber", "value": "1" },
+                { "key": "pageSize", "value": "10" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get List - 未登录（权限测试）",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "pm.request.headers.remove('Authorization');"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('未登录返回 401 未授权', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/karmapoints?pageNumber=1&pageSize=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "karmapoints"],
+              "query": [
+                { "key": "pageNumber", "value": "1" },
+                { "key": "pageSize", "value": "10" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Create - 创建积分记录",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('响应状态码为 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('响应格式为 JSON', function () {",
+                  "    pm.response.to.be.json;",
+                  "});",
+                  "",
+                  "pm.test('创建成功，code 为 200', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.code).to.eql(200);",
+                  "});",
+                  "",
+                  "pm.test('返回创建的积分记录信息', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    var karmaPoint = jsonData.data;",
+                  "    pm.expect(karmaPoint).to.have.property('id');",
+                  "    pm.expect(karmaPoint).to.have.property('userId');",
+                  "    pm.expect(karmaPoint).to.have.property('points');",
+                  "    pm.expect(karmaPoint).to.have.property('reason');",
+                  "    pm.expect(karmaPoint).to.have.property('transactionType');",
+                  "});",
+                  "",
+                  "pm.test('保存积分记录ID到变量', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    if (jsonData.data && jsonData.data.id) {",
+                  "        pm.variables.set('createdKarmaPointId', jsonData.data.id);",
+                  "    }",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"userId\": 1,\n    \"points\": 10,\n    \"reason\": \"分享食物\",\n    \"relatedId\": 1\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/karmapoints",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "karmapoints"]
+            }
+          }
+        },
+        {
+          "name": "Get My Points - 获取我的积分记录",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('响应状态码为 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('响应格式为 JSON', function () {",
+                  "    pm.response.to.be.json;",
+                  "});",
+                  "",
+                  "pm.test('获取成功，code 为 200', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.code).to.eql(200);",
+                  "});",
+                  "",
+                  "pm.test('返回积分记录列表', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.data).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/karmapoints/mine",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "karmapoints", "mine"]
+            }
+          }
+        },
+        {
+          "name": "Get By Id - 获取积分记录详情",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('响应状态码为 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('响应格式为 JSON', function () {",
+                  "    pm.response.to.be.json;",
+                  "});",
+                  "",
+                  "pm.test('获取成功，code 为 200', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.code).to.eql(200);",
+                  "});",
+                  "",
+                  "pm.test('返回完整的积分记录信息', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    var karmaPoint = jsonData.data;",
+                  "    pm.expect(karmaPoint).to.have.property('id');",
+                  "    pm.expect(karmaPoint).to.have.property('userId');",
+                  "    pm.expect(karmaPoint).to.have.property('points');",
+                  "    pm.expect(karmaPoint).to.have.property('reason');",
+                  "    pm.expect(karmaPoint).to.have.property('transactionType');",
+                  "    pm.expect(karmaPoint).to.have.property('createdAt');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/karmapoints/{{createdKarmaPointId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "karmapoints", "{{createdKarmaPointId}}"]
+            }
+          }
+        },
+        {
+          "name": "Update - 更新积分记录",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('响应状态码为 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('响应格式为 JSON', function () {",
+                  "    pm.response.to.be.json;",
+                  "});",
+                  "",
+                  "pm.test('更新成功，code 为 200', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.code).to.eql(200);",
+                  "});",
+                  "",
+                  "pm.test('积分记录已更新', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    var karmaPoint = jsonData.data;",
+                  "    pm.expect(karmaPoint.points).to.eql(20);",
+                  "    pm.expect(karmaPoint.reason).to.eql('更新后的原因');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"userId\": 1,\n    \"points\": 20,\n    \"reason\": \"更新后的原因\",\n    \"relatedId\": 1\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/karmapoints/{{createdKarmaPointId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "karmapoints", "{{createdKarmaPointId}}"]
+            }
+          }
+        },
+        {
+          "name": "Delete - 删除积分记录",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('响应状态码为 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('响应格式为 JSON', function () {",
+                  "    pm.response.to.be.json;",
+                  "});",
+                  "",
+                  "pm.test('删除成功，code 为 200', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.code).to.eql(200);",
+                  "});",
+                  "",
+                  "pm.test('返回成功消息', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.message).to.include('已删除');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/karmapoints/{{createdKarmaPointId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "karmapoints", "{{createdKarmaPointId}}"]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Stats - 统计接口",
+      "description": "统计相关接口：获取总览统计、获取趋势统计",
+      "item": [
+        {
+          "name": "Get Overview - 获取总览统计",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('响应状态码为 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('响应格式为 JSON', function () {",
+                  "    pm.response.to.be.json;",
+                  "});",
+                  "",
+                  "pm.test('获取成功，code 为 200', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.code).to.eql(200);",
+                  "});",
+                  "",
+                  "pm.test('返回所有统计字段', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    var stats = jsonData.data;",
+                  "    pm.expect(stats).to.have.property('totalUsers');",
+                  "    pm.expect(stats).to.have.property('totalPosts');",
+                  "    pm.expect(stats).to.have.property('totalReservations');",
+                  "    pm.expect(stats).to.have.property('totalPickupCodes');",
+                  "    pm.expect(stats).to.have.property('totalKarmaPoints');",
+                  "    pm.expect(stats).to.have.property('activePosts');",
+                  "    pm.expect(stats).to.have.property('completedReservations');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/stats/overview",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "stats", "overview"]
+            }
+          }
+        },
+        {
+          "name": "Get Overview - 未登录（权限测试）",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "pm.request.headers.remove('Authorization');"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('未登录返回 401 未授权', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/stats/overview",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "stats", "overview"]
+            }
+          }
+        },
+        {
+          "name": "Get Trends - 获取趋势统计",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('响应状态码为 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "pm.test('响应格式为 JSON', function () {",
+                  "    pm.response.to.be.json;",
+                  "});",
+                  "",
+                  "pm.test('获取成功，code 为 200', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    pm.expect(jsonData.code).to.eql(200);",
+                  "});",
+                  "",
+                  "pm.test('返回趋势统计数据', function () {",
+                  "    var jsonData = pm.response.json();",
+                  "    var trends = jsonData.data;",
+                  "    pm.expect(trends).to.have.property('dailyPosts');",
+                  "    pm.expect(trends).to.have.property('dailyReservations');",
+                  "    pm.expect(trends).to.have.property('dailyNewUsers');",
+                  "    pm.expect(trends.dailyPosts).to.be.an('array');",
+                  "    pm.expect(trends.dailyReservations).to.be.an('array');",
+                  "    pm.expect(trends.dailyNewUsers).to.be.an('array');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/stats/trends?days=7",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "stats", "trends"],
+              "query": [
+                { "key": "days", "value": "7" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Trends - 未登录（权限测试）",
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "exec": [
+                  "pm.request.headers.remove('Authorization');"
+                ],
+                "type": "text/javascript"
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('未登录返回 401 未授权', function () {",
+                  "    pm.response.to.have.status(401);",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/stats/trends?days=7",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "stats", "trends"],
+              "query": [
+                { "key": "days", "value": "7" }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
+

@@ -678,9 +678,9 @@ public class AppDbContext : DbContext
         {
             entity.HasKey(r => r.Id);
 
-            entity.HasIndex(r => new { r.ReservationId, r.ReviewerId })
+            entity.HasIndex(r => new { r.ReservationId, r.ReviewerId, r.UniqueGuard })
                   .IsUnique()
-                  .HasDatabaseName("IX_Reviews_ReservationId_ReviewerId");
+                  .HasDatabaseName("IX_Reviews_ReservationId_ReviewerId_UniqueGuard");
 
             entity.HasIndex(r => new { r.PublisherId, r.Status, r.CreatedAt })
                   .HasDatabaseName("IX_Reviews_PublisherId_Status_CreatedAt");
@@ -726,6 +726,9 @@ public class AppDbContext : DbContext
 
             entity.Property(r => r.FlagDetail)
                   .HasMaxLength(500);
+
+            entity.Property(r => r.UniqueGuard)
+                  .HasDefaultValue(0);
 
             entity.Property(r => r.CreatedAt)
                   .HasColumnType("timestamp").HasDefaultValueSql("CURRENT_TIMESTAMP");
@@ -831,6 +834,11 @@ public class AppDbContext : DbContext
             }
 
             CreateAuditSnapshot(entry);
+
+            if (entry.Entity is Review review)
+            {
+                entry.Property("UniqueGuard").CurrentValue = null;
+            }
 
             HandleCascadeSoftDelete(entry);
         }

@@ -67,4 +67,6 @@ public class Review : ISoftDeletable
 
     [MaxLength(500)]
     public string? DeletionReason { get; set; }
+
+    public int? UniqueGuard { get; set; }
 }

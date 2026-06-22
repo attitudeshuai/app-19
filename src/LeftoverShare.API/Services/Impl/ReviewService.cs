@@ -316,7 +316,7 @@ public class ReviewService : IReviewService
 
         var userReviewCount = await _unitOfWork.Reviews.CountByReviewerIdAsync(reviewerId);
         var recentReviews = (await _unitOfWork.Reviews.GetByReviewerIdAsync(reviewerId))
-            .Where(r => r.CreatedAt >= DateTime.UtcNow.AddHours(1))
+            .Where(r => r.CreatedAt >= DateTime.UtcNow.AddHours(-1))
             .ToList();
 
         if (recentReviews.Count >= 5)

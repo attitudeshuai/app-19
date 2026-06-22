@@ -69,7 +69,7 @@ public class SharePostService : ISharePostService
             return ApiResponse.Fail("用户不存在", 404);
         }
 
-        var post = _mapper.Map<SharePostEntity>(request);
+        var post = _mapper.Map<SharePostEntity>(request) ?? new SharePostEntity();
         post.PosterId = userId;
         post.Status = SharePostStatus.Available;
         post.CreatedAt = DateTime.UtcNow;

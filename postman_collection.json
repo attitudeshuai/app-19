@@ -1,4 +1,4 @@
-﻿﻿﻿﻿﻿﻿{
+﻿﻿﻿﻿﻿{
   "info": {
     "name": "LeftoverShare API Test Collection",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
@@ -1156,6 +1156,339 @@
               "path": ["api", "reservations", "{{createdReservationId}}"]
             }
           }
+        },
+        {
+          "name": "Concurrency Tests - 并发测试",
+          "description": "高并发预约场景测试，包括库存扣减、重复预约、并发冲突等边界情况",
+          "item": [
+            {
+              "name": "Create - 预约不存在的帖子",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('响应状态码为 404', function () {",
+                      "    pm.response.to.have.status(404);",
+                      "});",
+                      "",
+                      "pm.test('响应格式为 JSON', function () {",
+                      "    pm.response.to.be.json;",
+                      "});",
+                      "",
+                      "pm.test('返回业务错误码 1001（帖子不存在）', function () {",
+                      "    var jsonData = pm.response.json();",
+                      "    pm.expect(jsonData.errorCode).to.eql(1001);",
+                      "});",
+                      "",
+                      "pm.test('错误信息包含帖子ID', function () {",
+                      "    var jsonData = pm.response.json();",
+                      "    pm.expect(jsonData.message).to.include('99999');",
+                      "});"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"postId\": 99999,\n    \"note\": \"测试预约不存在的帖子\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/reservations",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "reservations"]
+                }
+              }
+            },
+            {
+              "name": "Create - 预约状态不可用的帖子",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('响应状态码为 400', function () {",
+                      "    pm.response.to.have.status(400);",
+                      "});",
+                      "",
+                      "pm.test('响应格式为 JSON', function () {",
+                      "    pm.response.to.be.json;",
+                      "});",
+                      "",
+                      "pm.test('返回业务错误码 1002（帖子不可用）', function () {",
+                      "    var jsonData = pm.response.json();",
+                      "    pm.expect(jsonData.errorCode).to.eql(1002);",
+                      "});",
+                      "",
+                      "pm.test('错误详情包含当前状态', function () {",
+                      "    var jsonData = pm.response.json();",
+                      "    pm.expect(jsonData.errorDetails).to.have.property('currentStatus');",
+                      "});"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"postId\": \"{{createdPostId}}\",\n    \"note\": \"测试预约不可用的帖子\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/reservations",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "reservations"]
+                }
+              }
+            },
+            {
+              "name": "Create - 预约自己发布的帖子",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('响应状态码为 400', function () {",
+                      "    pm.response.to.have.status(400);",
+                      "});",
+                      "",
+                      "pm.test('响应格式为 JSON', function () {",
+                      "    pm.response.to.be.json;",
+                      "});",
+                      "",
+                      "pm.test('返回业务错误码 1003（不能预约自己的帖子）', function () {",
+                      "    var jsonData = pm.response.json();",
+                      "    pm.expect(jsonData.errorCode).to.eql(1003);",
+                      "});",
+                      "",
+                      "pm.test('错误详情包含用户ID和帖子ID', function () {",
+                      "    var jsonData = pm.response.json();",
+                      "    pm.expect(jsonData.errorDetails).to.have.property('postId');",
+                      "    pm.expect(jsonData.errorDetails).to.have.property('userId');",
+                      "});"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"postId\": \"{{createdPostId}}\",\n    \"note\": \"测试预约自己的帖子\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/reservations",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "reservations"]
+                }
+              }
+            },
+            {
+              "name": "Create - 重复预约（同一用户预约同一帖子）",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('响应状态码为 409', function () {",
+                      "    pm.response.to.have.status(409);",
+                      "});",
+                      "",
+                      "pm.test('响应格式为 JSON', function () {",
+                      "    pm.response.to.be.json;",
+                      "});",
+                      "",
+                      "pm.test('返回业务错误码 3001（重复预约）', function () {",
+                      "    var jsonData = pm.response.json();",
+                      "    pm.expect(jsonData.errorCode).to.eql(3001);",
+                      "});",
+                      "",
+                      "pm.test('错误详情包含现有预约信息', function () {",
+                      "    var jsonData = pm.response.json();",
+                      "    pm.expect(jsonData.errorDetails).to.have.property('existingReservation');",
+                      "});"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"postId\": \"{{createdPostId}}\",\n    \"note\": \"测试重复预约\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/reservations",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "reservations"]
+                }
+              }
+            },
+            {
+              "name": "Create - 库存不足",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('响应状态码为 400', function () {",
+                      "    pm.response.to.have.status(400);",
+                      "});",
+                      "",
+                      "pm.test('响应格式为 JSON', function () {",
+                      "    pm.response.to.be.json;",
+                      "});",
+                      "",
+                      "pm.test('返回业务错误码 2001（库存不足）', function () {",
+                      "    var jsonData = pm.response.json();",
+                      "    pm.expect(jsonData.errorCode).to.eql(2001);",
+                      "});",
+                      "",
+                      "pm.test('错误详情包含可用数量和请求数量', function () {",
+                      "    var jsonData = pm.response.json();",
+                      "    pm.expect(jsonData.errorDetails).to.have.property('availableQuantity');",
+                      "    pm.expect(jsonData.errorDetails).to.have.property('requestedQuantity');",
+                      "});"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"postId\": \"{{createdPostId}}\",\n    \"note\": \"测试库存不足\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/reservations",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "reservations"]
+                }
+              }
+            },
+            {
+              "name": "Create - 并发冲突（模拟高并发场景）",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('响应状态码为 409 或 200', function () {",
+                      "    pm.expect(pm.response.code).to.be.oneOf([200, 409]);",
+                      "});",
+                      "",
+                      "pm.test('响应格式为 JSON', function () {",
+                      "    pm.response.to.be.json;",
+                      "});",
+                      "",
+                      "if (pm.response.code === 409) {",
+                      "    pm.test('并发冲突返回业务错误码 4001', function () {",
+                      "        var jsonData = pm.response.json();",
+                      "        pm.expect(jsonData.errorCode).to.eql(4001);",
+                      "    });",
+                      "",
+                      "    pm.test('错误详情包含重试信息', function () {",
+                      "        var jsonData = pm.response.json();",
+                      "        pm.expect(jsonData.errorDetails).to.have.property('canRetry');",
+                      "        pm.expect(jsonData.errorDetails).to.have.property('retryCount');",
+                      "    });",
+                      "}",
+                      "",
+                      "if (pm.response.code === 200) {",
+                      "    pm.test('预约成功返回正确数据', function () {",
+                      "        var jsonData = pm.response.json();",
+                      "        pm.expect(jsonData.code).to.eql(200);",
+                      "        pm.expect(jsonData.data).to.have.property('id');",
+                      "    });",
+                      "}"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"postId\": \"{{createdPostId}}\",\n    \"note\": \"测试并发冲突\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/reservations",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "reservations"]
+                }
+              }
+            },
+            {
+              "name": "Delete - 取消预约恢复库存",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "pm.test('响应状态码为 200', function () {",
+                      "    pm.response.to.have.status(200);",
+                      "});",
+                      "",
+                      "pm.test('响应格式为 JSON', function () {",
+                      "    pm.response.to.be.json;",
+                      "});",
+                      "",
+                      "pm.test('取消成功，code 为 200', function () {",
+                      "    var jsonData = pm.response.json();",
+                      "    pm.expect(jsonData.code).to.eql(200);",
+                      "});",
+                      "",
+                      "pm.test('返回成功消息', function () {",
+                      "    var jsonData = pm.response.json();",
+                      "    pm.expect(jsonData.message).to.include('已取消');",
+                      "});",
+                      "",
+                      "pm.test('帖子状态恢复为 Available', function () {",
+                      "    var postId = pm.variables.get('createdPostId');",
+                      "    if (postId) {",
+                      "        pm.sendRequest(",
+                      "            pm.variables.get('baseUrl') + '/api/shareposts/' + postId,",
+                      "            function (err, response) {",
+                      "                if (!err) {",
+                      "                    var postData = response.json();",
+                      "                    if (postData.data) {",
+                      "                        pm.expect(postData.data.status).to.eql('Available');",
+                      "                    }",
+                      "                }",
+                      "            }",
+                      "        );",
+                      "    }",
+                      "});"
+                    ],
+                    "type": "text/javascript"
+                  }
+                }
+              ],
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/reservations/{{createdReservationId}}",
+                  "host": ["{{baseUrl}}"],
+                  "path": ["api", "reservations", "{{createdReservationId}}"]
+                }
+              }
+            }
+          ]
         }
       ]
     },

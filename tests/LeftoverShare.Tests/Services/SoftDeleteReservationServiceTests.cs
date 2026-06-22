@@ -1,4 +1,5 @@
 using LeftoverShare.API.Entities.Enums;
+using Microsoft.Extensions.Logging;
 
 namespace LeftoverShare.Tests.Services;
 
@@ -6,13 +7,18 @@ public class SoftDeleteReservationServiceTests
 {
     private readonly Mock<IUnitOfWork> _unitOfWorkMock;
     private readonly Mock<IMapper> _mapperMock;
+    private readonly Mock<ILogger<ReservationService>> _loggerMock;
     private readonly ReservationService _reservationService;
 
     public SoftDeleteReservationServiceTests()
     {
         _unitOfWorkMock = new Mock<IUnitOfWork>();
         _mapperMock = new Mock<IMapper>();
-        _reservationService = new ReservationService(_unitOfWorkMock.Object, _mapperMock.Object);
+        _loggerMock = new Mock<ILogger<ReservationService>>();
+        _reservationService = new ReservationService(
+            _unitOfWorkMock.Object,
+            _mapperMock.Object,
+            _loggerMock.Object);
     }
 
     [Fact]
@@ -26,20 +32,44 @@ public class SoftDeleteReservationServiceTests
             Status = ReservationStatus.Pending,
             IsDeleted = false,
             DeletedAt = null,
-            DeletedBy = null
+            DeletedBy = null,
+            Quantity = 1
         };
 
         var post = new SharePost
         {
             Id = 1,
             PosterId = 2,
-            Status = SharePostStatus.Reserved
+            Status = SharePostStatus.Reserved,
+            Quantity = 10,
+            ReservedQuantity = 5
         };
+
+        var refreshedPost = new SharePost
+        {
+            Id = 1,
+            PosterId = 2,
+            Status = SharePostStatus.Reserved,
+            Quantity = 10,
+            ReservedQuantity = 4
+        };
+
+        var transactionMock = new Mock<Microsoft.EntityFrameworkCore.Storage.IDbContextTransaction>();
+        _unitOfWorkMock.Setup(x => x.BeginTransactionAsync())
+            .ReturnsAsync(transactionMock.Object);
+        _unitOfWorkMock.Setup(x => x.CommitTransactionAsync())
+            .Returns(Task.CompletedTask);
+        _unitOfWorkMock.Setup(x => x.RollbackTransactionAsync())
+            .Returns(Task.CompletedTask);
 
         _unitOfWorkMock.Setup(x => x.Reservations.GetByIdAsync(1))
             .ReturnsAsync(reservation);
         _unitOfWorkMock.Setup(x => x.SharePosts.GetByIdAsync(1))
             .ReturnsAsync(post);
+        _unitOfWorkMock.Setup(x => x.SharePosts.TryIncrementReservedQuantityAsync(1, 1))
+            .ReturnsAsync(true);
+        _unitOfWorkMock.Setup(x => x.SharePosts.GetByIdAsync(1))
+            .ReturnsAsync(refreshedPost);
         _unitOfWorkMock.Setup(x => x.SaveChangesAsync())
             .ReturnsAsync(1);
 
@@ -50,7 +80,6 @@ public class SoftDeleteReservationServiceTests
         reservation.Status.Should().Be(ReservationStatus.Cancelled);
         reservation.DeletedBy.Should().Be(1);
         reservation.DeletionReason.Should().Be("用户取消预订");
-        post.Status.Should().Be(SharePostStatus.Available);
         _unitOfWorkMock.Verify(x => x.Reservations.Update(It.Is<Reservation>(r =>
             r.Id == 1 &&
             r.Status == ReservationStatus.Cancelled &&
@@ -61,6 +90,7 @@ public class SoftDeleteReservationServiceTests
             p.Id == 1 &&
             p.Status == SharePostStatus.Available)), Times.Once);
         _unitOfWorkMock.Verify(x => x.SaveChangesAsync(), Times.Once);
+        _unitOfWorkMock.Verify(x => x.CommitTransactionAsync(), Times.Once);
     }
 
     [Fact]

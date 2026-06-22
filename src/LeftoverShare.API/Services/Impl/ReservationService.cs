@@ -3,25 +3,53 @@ using LeftoverShare.API.DTOs.Common;
 using LeftoverShare.API.DTOs.Reservations;
 using LeftoverShare.API.Entities.Enums;
 using LeftoverShare.API.Helpers;
+using LeftoverShare.API.Helpers.Exceptions;
 using LeftoverShare.API.Repositories;
+using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Logging;
 using KarmaPointEntity = LeftoverShare.API.Entities.KarmaPoint;
 using PickupCodeEntity = LeftoverShare.API.Entities.PickupCode;
 using ReservationEntity = LeftoverShare.API.Entities.Reservation;
+using SharePostEntity = LeftoverShare.API.Entities.SharePost;
 
 namespace LeftoverShare.API.Services.Impl;
 
 /// <summary>
 /// 预约服务实现
+/// 高并发设计要点：
+/// 1. 原子性库存扣减（原生 SQL + WHERE 条件）
+/// 2. 乐观并发控制（RowVersion）
+/// 3. 数据库事务隔离级别（Read Committed）
+/// 4. 幂等性检查（防重复预约）
+/// 5. 指数退避重试机制
+/// 6. 异常自动回滚
 /// </summary>
 public class ReservationService : IReservationService
 {
     private readonly IUnitOfWork _unitOfWork;
     private readonly IMapper _mapper;
+    private readonly ILogger<ReservationService> _logger;
 
-    public ReservationService(IUnitOfWork unitOfWork, IMapper mapper)
+    /// <summary>
+    /// 最大重试次数
+    /// </summary>
+    private const int MaxRetryAttempts = 3;
+
+    /// <summary>
+    /// 初始重试延迟（毫秒）
+    /// </summary>
+    private const int InitialRetryDelayMs = 50;
+
+    /// <summary>
+    /// 预约数量（当前设计为每次预约1份）
+    /// </summary>
+    private const int ReservationQuantity = 1;
+
+    public ReservationService(IUnitOfWork unitOfWork, IMapper mapper, ILogger<ReservationService> logger)
     {
         _unitOfWork = unitOfWork;
         _mapper = mapper;
+        _logger = logger;
     }
 
     /// <summary>
@@ -78,58 +106,184 @@ public class ReservationService : IReservationService
     }
 
     /// <summary>
-    /// 创建预约：检查帖子Available状态，不能预约自己的帖子，设置PostId/ClaimerId，
-    /// 生成取餐码，更新帖子状态为Reserved
+    /// 创建预约（高并发安全版本）
+    /// 业务流程：
+    /// 1. 前置校验（帖子存在、状态、权限）
+    /// 2. 幂等性检查（防止重复预约）
+    /// 3. 原子性库存扣减
+    /// 4. 创建预约记录
+    /// 5. 更新帖子状态（如果全部约完）
+    /// 6. 异常重试与回滚
     /// </summary>
     public async Task<ApiResponse> CreateAsync(int userId, CreateReservationRequest request)
     {
-        var post = await _unitOfWork.SharePosts.GetByIdAsync(request.PostId);
-        if (post == null)
+        int retryCount = 0;
+        while (true)
         {
-            return ApiResponse.Fail("帖子不存在", 404);
+            try
+            {
+                return await CreateReservationWithTransactionAsync(userId, request, retryCount);
+            }
+            catch (DbUpdateConcurrencyException)
+            {
+                retryCount++;
+                if (retryCount >= MaxRetryAttempts)
+                {
+                    _logger.LogWarning(
+                        "预约失败：达到最大重试次数 {MaxRetryAttempts}，PostId: {PostId}, UserId: {UserId}",
+                        MaxRetryAttempts, request.PostId, userId);
+                    throw ReservationException.ReservationTimeout(request.PostId, MaxRetryAttempts);
+                }
+
+                var delay = InitialRetryDelayMs * (int)Math.Pow(2, retryCount - 1);
+                _logger.LogInformation(
+                    "检测到并发冲突，正在进行第 {RetryCount} 次重试，延迟 {Delay}ms，PostId: {PostId}, UserId: {UserId}",
+                    retryCount, delay, request.PostId, userId);
+                await Task.Delay(delay);
+            }
         }
+    }
 
-        if (post.Status != SharePostStatus.Available)
+    /// <summary>
+    /// 使用事务执行预约创建
+    /// 业务意图：在事务中执行所有操作，确保数据一致性
+    /// </summary>
+    private async Task<ApiResponse> CreateReservationWithTransactionAsync(int userId, CreateReservationRequest request, int retryCount)
+    {
+        using var transaction = await _unitOfWork.BeginTransactionAsync();
+        try
         {
-            return ApiResponse.Fail("该帖子当前不可预订");
+            var post = await _unitOfWork.SharePosts.GetByIdAsync(request.PostId);
+            if (post == null)
+            {
+                throw ReservationException.PostNotFound(request.PostId);
+            }
+
+            if (post.Status != SharePostStatus.Available)
+            {
+                throw ReservationException.PostNotAvailable(request.PostId, post.Status.ToString());
+            }
+
+            if (post.PosterId == userId)
+            {
+                throw ReservationException.CannotReserveOwnPost(request.PostId, userId);
+            }
+
+            var hasExistingReservation = await _unitOfWork.SharePosts.HasExistingReservationAsync(request.PostId, userId);
+            if (hasExistingReservation)
+            {
+                throw ReservationException.DuplicateReservation(request.PostId, userId);
+            }
+
+            var availableQuantity = await _unitOfWork.SharePosts.GetAvailableQuantityAsync(request.PostId);
+            if (availableQuantity < ReservationQuantity)
+            {
+                throw ReservationException.InsufficientStock(request.PostId, availableQuantity, ReservationQuantity);
+            }
+
+            var stockDecremented = await _unitOfWork.SharePosts.TryDecrementReservedQuantityAsync(
+                request.PostId, ReservationQuantity);
+
+            if (!stockDecremented)
+            {
+                throw ReservationException.ConcurrencyConflict(request.PostId, retryCount);
+            }
+
+            var refreshedPost = await _unitOfWork.SharePosts.GetByIdAsync(request.PostId);
+            if (refreshedPost == null)
+            {
+                throw ReservationException.PostNotFound(request.PostId);
+            }
+
+            var newReservedQuantity = refreshedPost.ReservedQuantity;
+            var totalQuantity = refreshedPost.Quantity;
+            var isFullyReserved = newReservedQuantity >= totalQuantity;
+
+            var pickupCode = PickupCodeGenerator.Generate();
+
+            var reservation = new ReservationEntity
+            {
+                PostId = request.PostId,
+                ClaimerId = userId,
+                Quantity = ReservationQuantity,
+                PickupCode = pickupCode,
+                Status = ReservationStatus.Pending,
+                Note = request.Note,
+                ReservedAt = DateTime.UtcNow
+            };
+
+            await _unitOfWork.Reservations.AddAsync(reservation);
+
+            var pickupCodeEntity = new PickupCodeEntity
+            {
+                ReservationId = reservation.Id,
+                Code = pickupCode,
+                ExpiresAt = DateTime.UtcNow.AddHours(24),
+                IsUsed = false
+            };
+            await _unitOfWork.PickupCodes.AddAsync(pickupCodeEntity);
+
+            if (isFullyReserved)
+            {
+                refreshedPost.Status = SharePostStatus.Reserved;
+                _unitOfWork.SharePosts.Update(refreshedPost);
+            }
+
+            try
+            {
+                await _unitOfWork.SaveChangesAsync();
+            }
+            catch (DbUpdateConcurrencyException ex)
+            {
+                await _unitOfWork.RollbackTransactionAsync();
+                _logger.LogWarning(ex,
+                    "保存预约时发生并发冲突，PostId: {PostId}, UserId: {UserId}",
+                    request.PostId, userId);
+                throw;
+            }
+            catch (DbUpdateException ex)
+                when (ex.InnerException?.Message.Contains("IX_Reservations_PostId_ClaimerId") == true)
+            {
+                _logger.LogWarning(
+                    "检测到唯一索引冲突（重复预约），PostId: {PostId}, UserId: {UserId}",
+                    request.PostId, userId);
+                throw ReservationException.DuplicateReservation(request.PostId, userId);
+            }
+
+            await _unitOfWork.CommitTransactionAsync();
+
+            _logger.LogInformation(
+                "预约成功：PostId: {PostId}, UserId: {UserId}, ReservationId: {ReservationId}",
+                request.PostId, userId, reservation.Id);
+
+            var reservationResponse = _mapper.Map<ReservationResponse>(reservation);
+            return ApiResponse.Success(reservationResponse, "预订成功");
         }
-
-        if (post.PosterId == userId)
+        catch (ReservationException)
         {
-            return ApiResponse.Fail("不能预订自己发布的帖子");
+            try
+            {
+                await _unitOfWork.RollbackTransactionAsync();
+            }
+            catch { /* 忽略回滚错误 */ }
+            throw;
         }
-
-        var pickupCode = PickupCodeGenerator.Generate();
-
-        var reservation = new ReservationEntity
+        catch (DbUpdateConcurrencyException)
         {
-            PostId = request.PostId,
-            ClaimerId = userId,
-            Quantity = 1,
-            PickupCode = pickupCode,
-            Status = ReservationStatus.Pending,
-            Note = request.Note,
-            ReservedAt = DateTime.UtcNow
-        };
-
-        await _unitOfWork.Reservations.AddAsync(reservation);
-
-        var pickupCodeEntity = new PickupCodeEntity
+            throw;
+        }
+        catch (Exception ex)
         {
-            ReservationId = reservation.Id,
-            Code = pickupCode,
-            ExpiresAt = DateTime.UtcNow.AddHours(24),
-            IsUsed = false
-        };
-        await _unitOfWork.PickupCodes.AddAsync(pickupCodeEntity);
-
-        post.Status = SharePostStatus.Reserved;
-        _unitOfWork.SharePosts.Update(post);
-
-        await _unitOfWork.SaveChangesAsync();
-
-        var reservationResponse = _mapper.Map<ReservationResponse>(reservation);
-        return ApiResponse.Success(reservationResponse, "预订成功");
+            _logger.LogError(ex,
+                "创建预约时发生未知错误，PostId: {PostId}, UserId: {UserId}",
+                request.PostId, userId);
+            try
+            {
+                await _unitOfWork.RollbackTransactionAsync();
+            }
+            catch { /* 忽略回滚错误 */ }
+            throw;
+        }
     }
 
     /// <summary>
@@ -158,42 +312,86 @@ public class ReservationService : IReservationService
     }
 
     /// <summary>
-    /// 取消预约：恢复帖子状态为Available
+    /// 取消预约：恢复帖子状态为Available，恢复库存
     /// </summary>
     public async Task<ApiResponse> DeleteAsync(int id, int userId)
     {
-        var reservation = await _unitOfWork.Reservations.GetByIdAsync(id);
-        if (reservation == null)
+        using var transaction = await _unitOfWork.BeginTransactionAsync();
+        ReservationEntity? reservation = null;
+        try
         {
-            return ApiResponse.Fail("预订不存在", 404);
-        }
+            reservation = await _unitOfWork.Reservations.GetByIdAsync(id);
+            if (reservation == null)
+            {
+                throw new KeyNotFoundException("预订不存在");
+            }
 
-        var post = await _unitOfWork.SharePosts.GetByIdAsync(reservation.PostId);
-        if (reservation.ClaimerId != userId && post?.PosterId != userId)
+            var post = await _unitOfWork.SharePosts.GetByIdAsync(reservation.PostId);
+            if (reservation.ClaimerId != userId && post?.PosterId != userId)
+            {
+                throw new UnauthorizedAccessException("无权限取消此预订");
+            }
+
+            if (reservation.Status == ReservationStatus.Completed)
+            {
+                await _unitOfWork.RollbackTransactionAsync();
+                return ApiResponse.Fail("已完成的预订无法取消");
+            }
+
+            if (reservation.Status != ReservationStatus.Cancelled)
+            {
+                reservation.Status = ReservationStatus.Cancelled;
+                reservation.DeletedBy = userId;
+                reservation.DeletionReason = "用户取消预订";
+                _unitOfWork.Reservations.Update(reservation);
+
+                if (post != null && reservation.Quantity > 0)
+                {
+                    var stockRestored = await _unitOfWork.SharePosts.TryIncrementReservedQuantityAsync(
+                        reservation.PostId, reservation.Quantity);
+
+                    if (stockRestored)
+                    {
+                        var refreshedPost = await _unitOfWork.SharePosts.GetByIdAsync(reservation.PostId);
+                        if (refreshedPost != null)
+                        {
+                            var availableQuantity = refreshedPost.Quantity - refreshedPost.ReservedQuantity;
+                            if (availableQuantity > 0 && refreshedPost.Status == SharePostStatus.Reserved)
+                            {
+                                refreshedPost.Status = SharePostStatus.Available;
+                                _unitOfWork.SharePosts.Update(refreshedPost);
+                            }
+                        }
+                    }
+                }
+
+                _unitOfWork.Reservations.Delete(reservation);
+            }
+
+            await _unitOfWork.SaveChangesAsync();
+            await _unitOfWork.CommitTransactionAsync();
+
+            _logger.LogInformation(
+                "预约已取消：ReservationId: {ReservationId}, PostId: {PostId}, UserId: {UserId}",
+                id, reservation.PostId, userId);
+
+            return ApiResponse.Success(null, "预订已取消");
+        }
+        catch (DbUpdateConcurrencyException ex)
         {
-            return ApiResponse.Fail("无权限取消此预订", 403);
+            var postId = reservation?.PostId ?? 0;
+            _logger.LogWarning(ex, "取消预约时发生并发冲突，ReservationId: {ReservationId}, PostId: {PostId}", id, postId);
+            throw ReservationException.ConcurrencyConflict(postId, 0);
         }
-
-        if (reservation.Status == ReservationStatus.Completed)
+        catch
         {
-            return ApiResponse.Fail("已完成的预订无法取消");
+            try
+            {
+                await _unitOfWork.RollbackTransactionAsync();
+            }
+            catch { /* 忽略回滚错误 */ }
+            throw;
         }
-
-        reservation.Status = ReservationStatus.Cancelled;
-        reservation.DeletedBy = userId;
-        reservation.DeletionReason = "用户取消预订";
-        _unitOfWork.Reservations.Update(reservation);
-
-        if (post != null)
-        {
-            post.Status = SharePostStatus.Available;
-            _unitOfWork.SharePosts.Update(post);
-        }
-
-        _unitOfWork.Reservations.Delete(reservation);
-        await _unitOfWork.SaveChangesAsync();
-
-        return ApiResponse.Success(null, "预订已取消");
     }
 
     /// <summary>

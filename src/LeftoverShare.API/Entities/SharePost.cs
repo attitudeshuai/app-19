@@ -60,10 +60,22 @@ public class SharePost : ISoftDeletable
     public string FoodType { get; set; } = string.Empty;
 
     /// <summary>
-    /// 数量
+    /// 总数量
     /// </summary>
     [Required]
     public int Quantity { get; set; } = 1;
+
+    /// <summary>
+    /// 已预约数量
+    /// </summary>
+    [Required]
+    public int ReservedQuantity { get; set; } = 0;
+
+    /// <summary>
+    /// 行版本号，用于乐观并发控制
+    /// </summary>
+    [Timestamp]
+    public byte[] RowVersion { get; set; } = Array.Empty<byte>();
 
     /// <summary>
     /// 取餐地址

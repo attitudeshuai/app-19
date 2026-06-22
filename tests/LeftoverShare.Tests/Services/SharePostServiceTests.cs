@@ -10,6 +10,15 @@ public class SharePostServiceTests
     {
         _unitOfWorkMock = new Mock<IUnitOfWork>();
         _mapperMock = new Mock<IMapper>();
+
+        var usersMock = new Mock<IUserRepository>();
+        _unitOfWorkMock.Setup(x => x.Users)
+            .Returns(usersMock.Object);
+
+        var sharePostsMock = new Mock<ISharePostRepository>();
+        _unitOfWorkMock.Setup(x => x.SharePosts)
+            .Returns(sharePostsMock.Object);
+
         _sharePostService = new SharePostService(_unitOfWorkMock.Object, _mapperMock.Object);
     }
 
@@ -28,6 +37,12 @@ public class SharePostServiceTests
 
         var user = new User { Id = 1, Username = "testuser" };
 
+        _unitOfWorkMock.Setup(x => x.Users.GetByIdAsync(1))
+            .ReturnsAsync(user);
+        _mapperMock.Setup(x => x.Map<SharePost>(It.IsAny<CreateSharePostRequest>()))
+            .Returns(new SharePost { Title = request.Title, Description = request.Description });
+        _mapperMock.Setup(x => x.Map<SharePostResponse>(It.IsAny<SharePost>()))
+            .Returns(new SharePostResponse { Id = 1, Title = request.Title });
         _unitOfWorkMock.Setup(x => x.SharePosts.AddAsync(It.IsAny<SharePost>()))
             .ReturnsAsync((SharePost p) => p);
         _unitOfWorkMock.Setup(x => x.SaveChangesAsync())

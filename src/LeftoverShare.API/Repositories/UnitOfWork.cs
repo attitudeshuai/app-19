@@ -1,4 +1,5 @@
 using LeftoverShare.API.Data;
+using Microsoft.EntityFrameworkCore.Storage;
 
 namespace LeftoverShare.API.Repositories;
 
@@ -41,5 +42,31 @@ public class UnitOfWork : IUnitOfWork
     public async Task<int> SaveChangesAsync()
     {
         return await _context.SaveChangesAsync();
+    }
+
+    /// <summary>
+    /// 开始事务
+    /// 业务意图：在高并发场景下执行多个数据库操作时，
+    /// 使用事务确保数据一致性
+    /// </summary>
+    public async Task<IDbContextTransaction> BeginTransactionAsync()
+    {
+        return await _context.Database.BeginTransactionAsync();
+    }
+
+    /// <summary>
+    /// 提交事务
+    /// </summary>
+    public async Task CommitTransactionAsync()
+    {
+        await _context.Database.CommitTransactionAsync();
+    }
+
+    /// <summary>
+    /// 回滚事务
+    /// </summary>
+    public async Task RollbackTransactionAsync()
+    {
+        await _context.Database.RollbackTransactionAsync();
     }
 }

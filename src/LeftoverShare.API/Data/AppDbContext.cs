@@ -157,6 +157,14 @@ public class AppDbContext : DbContext
                   .IsRequired()
                   .HasDefaultValue(1);
 
+            entity.Property(sp => sp.ReservedQuantity)
+                  .IsRequired()
+                  .HasDefaultValue(0);
+
+            entity.Property(sp => sp.RowVersion)
+                  .IsRowVersion()
+                  .IsConcurrencyToken();
+
             entity.Property(sp => sp.PickupAddress)
                   .IsRequired()
                   .HasMaxLength(200);

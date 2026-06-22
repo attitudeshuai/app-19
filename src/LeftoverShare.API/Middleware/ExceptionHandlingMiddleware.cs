@@ -2,6 +2,8 @@ using System.Net;
 using System.Text.Json;
 using FluentValidation;
 using LeftoverShare.API.Helpers;
+using LeftoverShare.API.Helpers.Exceptions;
+using Microsoft.EntityFrameworkCore;
 
 namespace LeftoverShare.API.Middleware;
 
@@ -55,9 +57,32 @@ public class ExceptionHandlingMiddleware
         // 根据异常类型设置状态码和错误信息
         var statusCode = HttpStatusCode.InternalServerError;
         var message = "服务器内部错误";
+        int? businessErrorCode = null;
+        IDictionary<string, object>? errorDetails = null;
 
         switch (exception)
         {
+            // 预约业务异常：返回 409 Conflict 或 400 Bad Request
+            case ReservationException reservationException:
+                statusCode = GetHttpStatusCodeForReservationError(reservationException.ErrorCode);
+                message = reservationException.Message;
+                businessErrorCode = (int)reservationException.ErrorCode;
+                errorDetails = reservationException.Details;
+                break;
+
+            // EF Core 并发冲突异常
+            case DbUpdateConcurrencyException concurrencyException:
+                statusCode = HttpStatusCode.Conflict;
+                message = "数据已被其他用户修改，请刷新后重试";
+                businessErrorCode = 4001;
+                errorDetails = new Dictionary<string, object>
+                {
+                    ["canRetry"] = true,
+                    ["suggestion"] = "请刷新页面后重试"
+                };
+                _logger.LogWarning(concurrencyException, "检测到数据库并发冲突");
+                break;
+
             // 验证异常：返回 400 Bad Request
             case ValidationException validationException:
                 statusCode = HttpStatusCode.BadRequest;
@@ -92,7 +117,11 @@ public class ExceptionHandlingMiddleware
         context.Response.StatusCode = (int)statusCode;
 
         // 使用非泛型 ApiResponse（NOT ApiResponse<>）返回统一格式
-        var response = ApiResponse.Fail(message, (int)statusCode);
+        var response = ApiResponse.Fail(
+            message: message,
+            code: (int)statusCode,
+            errorCode: businessErrorCode,
+            errorDetails: errorDetails);
 
         // 序列化响应并写入
         var jsonResponse = JsonSerializer.Serialize(response, new JsonSerializerOptions
@@ -101,5 +130,26 @@ public class ExceptionHandlingMiddleware
         });
 
         return context.Response.WriteAsync(jsonResponse);
+    }
+
+    /// <summary>
+    /// 根据预约错误码获取对应的 HTTP 状态码
+    /// </summary>
+    private static HttpStatusCode GetHttpStatusCodeForReservationError(LeftoverShare.API.Entities.Enums.ReservationErrorCode errorCode)
+    {
+        return errorCode switch
+        {
+            LeftoverShare.API.Entities.Enums.ReservationErrorCode.PostNotFound => HttpStatusCode.NotFound,
+            LeftoverShare.API.Entities.Enums.ReservationErrorCode.ReservationNotFound => HttpStatusCode.NotFound,
+            LeftoverShare.API.Entities.Enums.ReservationErrorCode.InsufficientStock => HttpStatusCode.Conflict,
+            LeftoverShare.API.Entities.Enums.ReservationErrorCode.QuantityExceedsAvailable => HttpStatusCode.Conflict,
+            LeftoverShare.API.Entities.Enums.ReservationErrorCode.DuplicateReservation => HttpStatusCode.Conflict,
+            LeftoverShare.API.Entities.Enums.ReservationErrorCode.ConcurrencyConflict => HttpStatusCode.Conflict,
+            LeftoverShare.API.Entities.Enums.ReservationErrorCode.ReservationTimeout => HttpStatusCode.ServiceUnavailable,
+            LeftoverShare.API.Entities.Enums.ReservationErrorCode.SystemBusy => HttpStatusCode.ServiceUnavailable,
+            LeftoverShare.API.Entities.Enums.ReservationErrorCode.PermissionDenied => HttpStatusCode.Forbidden,
+            LeftoverShare.API.Entities.Enums.ReservationErrorCode.InvalidStatusTransition => HttpStatusCode.Conflict,
+            _ => HttpStatusCode.BadRequest
+        };
     }
 }

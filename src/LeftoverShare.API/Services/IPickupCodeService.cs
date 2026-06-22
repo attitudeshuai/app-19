@@ -43,4 +43,22 @@ public interface IPickupCodeService
     /// <param name="userId">操作用户ID</param>
     /// <returns>操作结果响应</returns>
     Task<ApiResponse> DeleteAsync(int id, int userId);
+
+    /// <summary>
+    /// 从回收站恢复取餐码
+    /// 业务意图：恢复已软删除的取餐码，检查权限（只能恢复自己删除的、关联预订的领取者或帖子发布者）
+    /// </summary>
+    /// <param name="id">取餐码ID</param>
+    /// <param name="userId">操作用户ID</param>
+    /// <returns>操作结果响应</returns>
+    Task<ApiResponse> RestoreAsync(int id, int userId);
+
+    /// <summary>
+    /// 查询回收站取餐码列表
+    /// 业务意图：获取当前用户相关的已软删除取餐码，支持分页
+    /// </summary>
+    /// <param name="userId">用户ID</param>
+    /// <param name="request">分页请求参数</param>
+    /// <returns>包含回收站取餐码列表的响应</returns>
+    Task<ApiResponse> GetRecycleBinAsync(int userId, PagedRequest request);
 }

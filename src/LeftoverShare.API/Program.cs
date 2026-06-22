@@ -157,9 +157,13 @@ builder.Services.AddScoped<IPickupCodeRepository, PickupCodeRepository>();
 builder.Services.AddScoped<IKarmaPointRepository, KarmaPointRepository>();
 builder.Services.AddScoped<INotificationRepository, NotificationRepository>();
 builder.Services.AddScoped<IScheduledTaskLogRepository, ScheduledTaskLogRepository>();
+builder.Services.AddScoped<IDeletedEntitySnapshotRepository, DeletedEntitySnapshotRepository>();
 
 // 注册 UnitOfWork
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
+
+// 配置 DailyCleanupSettings
+builder.Services.Configure<DailyCleanupSettings>(builder.Configuration.GetSection(DailyCleanupSettings.SectionName));
 
 // 注册所有 Service
 builder.Services.AddScoped<IAuthService, AuthService>();
@@ -170,9 +174,12 @@ builder.Services.AddScoped<IKarmaPointService, KarmaPointService>();
 builder.Services.AddScoped<IStatsService, StatsService>();
 builder.Services.AddScoped<INotificationService, NotificationService>();
 builder.Services.AddScoped<IExpirationProcessingService, ExpirationProcessingService>();
+builder.Services.AddScoped<IRecycleBinService, RecycleBinService>();
+builder.Services.AddScoped<IHardCleanupService, HardCleanupService>();
 
 // 注册定时任务后台服务
 builder.Services.AddHostedService<DailyCleanupScheduler>();
+builder.Services.AddHostedService<HardCleanupScheduler>();
 
 // 添加控制器支持
 builder.Services.AddControllers();

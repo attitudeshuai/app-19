@@ -1,14 +1,24 @@
+using System.Linq.Expressions;
+using System.Text.Json;
 using LeftoverShare.API.Entities;
 using LeftoverShare.API.Entities.Enums;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.EntityFrameworkCore.ChangeTracking;
 
 namespace LeftoverShare.API.Data;
 
 // 数据库上下文，使用 MySQL，配置实体映射
 public class AppDbContext : DbContext
 {
+    private readonly HashSet<object> _hardDeleteEntities = new();
+
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options)
     {
+    }
+
+    internal void MarkForHardDelete(object entity)
+    {
+        _hardDeleteEntities.Add(entity);
     }
 
     // 用户表
@@ -25,6 +35,8 @@ public class AppDbContext : DbContext
     public DbSet<Notification> Notifications => Set<Notification>();
     // 定时任务日志表
     public DbSet<ScheduledTaskLog> ScheduledTaskLogs => Set<ScheduledTaskLog>();
+    // 软删除审计快照表
+    public DbSet<DeletedEntitySnapshot> DeletedEntitySnapshots => Set<DeletedEntitySnapshot>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -97,6 +109,10 @@ public class AppDbContext : DbContext
             entity.HasIndex(sp => new { sp.Latitude, sp.Longitude })
                   .HasDatabaseName("IX_SharePosts_Location");
 
+            // 软删除索引
+            entity.HasIndex(sp => new { sp.IsDeleted, sp.DeletedAt })
+                  .HasDatabaseName("IX_SharePosts_IsDeleted_DeletedAt");
+
             entity.Property(sp => sp.Title)
                   .IsRequired()
                   .HasMaxLength(100);
@@ -135,6 +151,12 @@ public class AppDbContext : DbContext
                   .HasConversion<string>()
                   .HasMaxLength(30);
 
+            entity.Property(sp => sp.IsDeleted)
+                  .HasDefaultValue(false);
+
+            entity.Property(sp => sp.DeletionReason)
+                  .HasMaxLength(500);
+
             // 使用 MySQL 的 NOW() 函数作为默认值
             entity.Property(sp => sp.CreatedAt)
                   .HasColumnType("timestamp").HasDefaultValueSql("CURRENT_TIMESTAMP");
@@ -144,6 +166,9 @@ public class AppDbContext : DbContext
                   .WithOne(r => r.Post)
                   .HasForeignKey(r => r.PostId)
                   .OnDelete(DeleteBehavior.Cascade);
+
+            // 全局查询过滤器：自动过滤已软删除的记录
+            entity.HasQueryFilter(sp => !sp.IsDeleted);
         });
 
         // ===== 预订实体配置 =====
@@ -160,6 +185,10 @@ public class AppDbContext : DbContext
             entity.HasIndex(r => new { r.ClaimerId, r.Status, r.ReservedAt })
                   .HasDatabaseName("IX_Reservations_ClaimerId_Status_ReservedAt");
 
+            // 软删除索引
+            entity.HasIndex(r => new { r.IsDeleted, r.DeletedAt })
+                  .HasDatabaseName("IX_Reservations_IsDeleted_DeletedAt");
+
             entity.Property(r => r.Status)
                   .IsRequired()
                   .HasConversion<string>()
@@ -173,6 +202,12 @@ public class AppDbContext : DbContext
             entity.Property(r => r.Note)
                   .HasMaxLength(500);
 
+            entity.Property(r => r.IsDeleted)
+                  .HasDefaultValue(false);
+
+            entity.Property(r => r.DeletionReason)
+                  .HasMaxLength(500);
+
             // 使用 MySQL 的 NOW() 函数作为默认值
             entity.Property(r => r.ReservedAt)
                   .HasColumnType("timestamp").HasDefaultValueSql("CURRENT_TIMESTAMP");
@@ -182,6 +217,9 @@ public class AppDbContext : DbContext
                   .WithOne(pc => pc.Reservation)
                   .HasForeignKey<PickupCode>(pc => pc.ReservationId)
                   .OnDelete(DeleteBehavior.Cascade);
+
+            // 全局查询过滤器：自动过滤已软删除的记录
+            entity.HasQueryFilter(r => !r.IsDeleted);
         });
 
         // ===== 取餐码实体配置 =====
@@ -197,6 +235,10 @@ public class AppDbContext : DbContext
             // 复合索引：预订+使用状态+过期时间
             entity.HasIndex(pc => new { pc.ReservationId, pc.IsUsed, pc.ExpiresAt })
                   .HasDatabaseName("IX_PickupCodes_ReservationId_IsUsed_ExpiresAt");
+
+            // 软删除索引
+            entity.HasIndex(pc => new { pc.IsDeleted, pc.DeletedAt })
+                  .HasDatabaseName("IX_PickupCodes_IsDeleted_DeletedAt");
 
             entity.Property(pc => pc.Code)
                   .IsRequired()
@@ -214,6 +256,15 @@ public class AppDbContext : DbContext
             entity.Property(pc => pc.ExpirationReason)
                   .HasConversion<string>()
                   .HasMaxLength(30);
+
+            entity.Property(pc => pc.IsDeleted)
+                  .HasDefaultValue(false);
+
+            entity.Property(pc => pc.DeletionReason)
+                  .HasMaxLength(500);
+
+            // 全局查询过滤器：自动过滤已软删除的记录
+            entity.HasQueryFilter(pc => !pc.IsDeleted);
         });
 
         // ===== 积分实体配置 =====
@@ -225,6 +276,10 @@ public class AppDbContext : DbContext
             entity.HasIndex(kp => new { kp.UserId, kp.CreatedAt })
                   .HasDatabaseName("IX_KarmaPoints_UserId_CreatedAt");
 
+            // 软删除索引
+            entity.HasIndex(kp => new { kp.IsDeleted, kp.DeletedAt })
+                  .HasDatabaseName("IX_KarmaPoints_IsDeleted_DeletedAt");
+
             entity.Property(kp => kp.Points)
                   .IsRequired();
 
@@ -232,9 +287,18 @@ public class AppDbContext : DbContext
                   .IsRequired()
                   .HasMaxLength(200);
 
+            entity.Property(kp => kp.IsDeleted)
+                  .HasDefaultValue(false);
+
+            entity.Property(kp => kp.DeletionReason)
+                  .HasMaxLength(500);
+
             // 使用 MySQL 的 NOW() 函数作为默认值
             entity.Property(kp => kp.CreatedAt)
                   .HasColumnType("timestamp").HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            // 全局查询过滤器：自动过滤已软删除的记录
+            entity.HasQueryFilter(kp => !kp.IsDeleted);
         });
 
         // ===== 站内通知实体配置 =====
@@ -321,5 +385,204 @@ public class AppDbContext : DbContext
             entity.Property(stl => stl.Details)
                   .HasMaxLength(8000);
         });
+
+        // ===== 软删除审计快照实体配置 =====
+        modelBuilder.Entity<DeletedEntitySnapshot>(entity =>
+        {
+            entity.HasKey(des => des.Id);
+
+            entity.HasIndex(des => new { des.EntityType, des.EntityId })
+                  .HasDatabaseName("IX_DeletedEntitySnapshots_EntityType_EntityId");
+
+            entity.HasIndex(des => new { des.DeletedBy, des.DeletedAt })
+                  .HasDatabaseName("IX_DeletedEntitySnapshots_DeletedBy_DeletedAt");
+
+            entity.HasIndex(des => des.DeletedAt)
+                  .HasDatabaseName("IX_DeletedEntitySnapshots_DeletedAt");
+
+            entity.Property(des => des.EntityType)
+                  .IsRequired()
+                  .HasMaxLength(100);
+
+            entity.Property(des => des.EntityDisplayName)
+                  .IsRequired()
+                  .HasMaxLength(500);
+
+            entity.Property(des => des.SnapshotData)
+                  .IsRequired()
+                  .HasColumnType("text");
+
+            entity.Property(des => des.DeletionReason)
+                  .HasMaxLength(500);
+
+            entity.Property(des => des.DeletedAt)
+                  .HasColumnType("timestamp").HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            entity.HasOne(des => des.DeletedByUser)
+                  .WithMany()
+                  .HasForeignKey(des => des.DeletedBy)
+                  .OnDelete(DeleteBehavior.Restrict);
+        });
+    }
+
+    public override int SaveChanges()
+    {
+        ProcessSoftDeletes();
+        return base.SaveChanges();
+    }
+
+    public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+    {
+        ProcessSoftDeletes();
+        return base.SaveChangesAsync(cancellationToken);
+    }
+
+    private void ProcessSoftDeletes()
+    {
+        var softDeleteEntries = ChangeTracker.Entries<ISoftDeletable>()
+            .Where(e => e.State == EntityState.Deleted && !_hardDeleteEntities.Contains(e.Entity))
+            .ToList();
+
+        foreach (var entry in softDeleteEntries)
+        {
+            entry.State = EntityState.Modified;
+            entry.Entity.IsDeleted = true;
+            entry.Entity.DeletedAt = DateTime.UtcNow;
+
+            if (entry.Entity.DeletedBy == null)
+            {
+                var deletedByProp = entry.Property("DeletedBy");
+                if (deletedByProp.CurrentValue == null || (int)deletedByProp.CurrentValue == 0)
+                {
+                    deletedByProp.CurrentValue = null;
+                }
+            }
+
+            CreateAuditSnapshot(entry);
+
+            HandleCascadeSoftDelete(entry);
+        }
+
+        _hardDeleteEntities.Clear();
+    }
+
+    private void CreateAuditSnapshot(EntityEntry<ISoftDeletable> entry)
+    {
+        var entityType = entry.Entity.GetType().Name;
+        var entityId = (int)entry.Property("Id").CurrentValue!;
+        var entityDisplayName = GetEntityDisplayName(entry);
+        var originalOwnerId = GetOriginalOwnerId(entry);
+        var deletionReason = entry.Entity.DeletionReason;
+        var deletedBy = entry.Entity.DeletedBy ?? 0;
+        var deletedAt = entry.Entity.DeletedAt ?? DateTime.UtcNow;
+
+        var snapshotData = new Dictionary<string, object?>();
+        foreach (var prop in entry.OriginalValues.Properties)
+        {
+            var propName = prop.Name;
+            var propValue = entry.OriginalValues[prop];
+            snapshotData[propName] = propValue;
+        }
+
+        var snapshot = new DeletedEntitySnapshot
+        {
+            EntityType = entityType,
+            EntityId = entityId,
+            EntityDisplayName = entityDisplayName,
+            SnapshotData = JsonSerializer.Serialize(snapshotData, new JsonSerializerOptions
+            {
+                WriteIndented = false
+            }),
+            DeletedBy = deletedBy,
+            DeletedAt = deletedAt,
+            DeletionReason = deletionReason,
+            OriginalOwnerId = originalOwnerId
+        };
+
+        DeletedEntitySnapshots.Add(snapshot);
+    }
+
+    private static string GetEntityDisplayName(EntityEntry<ISoftDeletable> entry)
+    {
+        var entity = entry.Entity;
+        return entity switch
+        {
+            SharePost sp => $"分享帖 #{sp.Id} - {sp.Title}",
+            Reservation r => $"预约 #{r.Id} - 帖子#{r.PostId} by 用户#{r.ClaimerId}",
+            PickupCode pc => $"取餐码 #{pc.Id} - {pc.Code}",
+            KarmaPoint kp => $"积分流水 #{kp.Id} - 用户#{kp.UserId} {kp.Points}分",
+            _ => $"{entity.GetType().Name} #{entry.Property("Id").CurrentValue}"
+        };
+    }
+
+    private static int? GetOriginalOwnerId(EntityEntry<ISoftDeletable> entry)
+    {
+        return entry.Entity switch
+        {
+            SharePost sp => sp.PosterId,
+            Reservation r => r.ClaimerId,
+            PickupCode pc => null,
+            KarmaPoint kp => kp.UserId,
+            _ => null
+        };
+    }
+
+    private void HandleCascadeSoftDelete(EntityEntry<ISoftDeletable> entry)
+    {
+        if (entry.Entity is SharePost post)
+        {
+            var relatedReservations = Reservations.Local
+                .Where(r => r.PostId == post.Id && !r.IsDeleted)
+                .ToList();
+
+            foreach (var res in relatedReservations)
+            {
+                var resEntry = Entry(res);
+                if (resEntry.State != EntityState.Deleted && resEntry.State != EntityState.Modified)
+                {
+                    res.IsDeleted = true;
+                    res.DeletedAt = DateTime.UtcNow;
+                    res.DeletedBy = post.DeletedBy;
+                    res.DeletionReason = $"级联删除：关联分享帖#{post.Id}已删除";
+                    resEntry.State = EntityState.Modified;
+                }
+            }
+
+            var relatedPickupCodes = PickupCodes.Local
+                .Where(pc => relatedReservations.Select(r => r.Id).Contains(pc.ReservationId) && !pc.IsDeleted)
+                .ToList();
+
+            foreach (var pickupCode in relatedPickupCodes)
+            {
+                var pcEntry = Entry(pickupCode);
+                if (pcEntry.State != EntityState.Deleted && pcEntry.State != EntityState.Modified)
+                {
+                    pickupCode.IsDeleted = true;
+                    pickupCode.DeletedAt = DateTime.UtcNow;
+                    pickupCode.DeletedBy = post.DeletedBy;
+                    pickupCode.DeletionReason = $"级联删除：关联分享帖#{post.Id}已删除";
+                    pcEntry.State = EntityState.Modified;
+                }
+            }
+        }
+
+        if (entry.Entity is Reservation reservationEntry)
+        {
+            var relatedPickupCode = PickupCodes.Local
+                .FirstOrDefault(pc => pc.ReservationId == reservationEntry.Id && !pc.IsDeleted);
+
+            if (relatedPickupCode != null)
+            {
+                var pcEntry = Entry(relatedPickupCode);
+                if (pcEntry.State != EntityState.Deleted && pcEntry.State != EntityState.Modified)
+                {
+                    relatedPickupCode.IsDeleted = true;
+                    relatedPickupCode.DeletedAt = DateTime.UtcNow;
+                    relatedPickupCode.DeletedBy = reservationEntry.DeletedBy;
+                    relatedPickupCode.DeletionReason = $"级联删除：关联预约#{reservationEntry.Id}已删除";
+                    pcEntry.State = EntityState.Modified;
+                }
+            }
+        }
     }
 }

@@ -7,7 +7,7 @@ namespace LeftoverShare.API.Entities;
 /// <summary>
 /// 分享帖子实体
 /// </summary>
-public class SharePost
+public class SharePost : ISoftDeletable
 {
     /// <summary>
     /// 帖子ID
@@ -111,4 +111,25 @@ public class SharePost
     /// 预订记录
     /// </summary>
     public virtual ICollection<Reservation> Reservations { get; set; } = new List<Reservation>();
+
+    /// <summary>
+    /// 是否已软删除
+    /// </summary>
+    public bool IsDeleted { get; set; } = false;
+
+    /// <summary>
+    /// 软删除时间
+    /// </summary>
+    public DateTime? DeletedAt { get; set; }
+
+    /// <summary>
+    /// 软删除操作者ID
+    /// </summary>
+    public int? DeletedBy { get; set; }
+
+    /// <summary>
+    /// 删除原因
+    /// </summary>
+    [MaxLength(500)]
+    public string? DeletionReason { get; set; }
 }

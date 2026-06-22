@@ -115,7 +115,7 @@ public class SharePostServiceTests
             .ReturnsAsync(post);
 
         var result = await _sharePostService.UpdateStatusAsync(1, 1,
-            new UpdateSharePostStatusRequest { Status = SharePostStatus.Reserved });
+            new UpdateSharePostStatusRequest { Status = SharePostStatus.Reserved.ToString() });
 
         result.Should().NotBeNull();
         result.Code.Should().Be(403);
@@ -132,7 +132,7 @@ public class SharePostServiceTests
             .ReturnsAsync(1);
 
         var result = await _sharePostService.UpdateStatusAsync(1, 1,
-            new UpdateSharePostStatusRequest { Status = SharePostStatus.Reserved });
+            new UpdateSharePostStatusRequest { Status = SharePostStatus.Reserved.ToString() });
 
         result.Should().NotBeNull();
         result.Code.Should().Be(200);

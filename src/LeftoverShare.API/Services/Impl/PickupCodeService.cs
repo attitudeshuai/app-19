@@ -118,9 +118,85 @@ public class PickupCodeService : IPickupCodeService
             return ApiResponse.Fail("无权限删除此取餐码", 403);
         }
 
+        pickupCode.DeletedBy = userId;
+        pickupCode.DeletionReason = "用户主动删除";
+
         _unitOfWork.PickupCodes.Delete(pickupCode);
         await _unitOfWork.SaveChangesAsync();
 
         return ApiResponse.Success(null, "取餐码已删除");
+    }
+
+    /// <summary>
+    /// 从回收站恢复取餐码
+    /// </summary>
+    public async Task<ApiResponse> RestoreAsync(int id, int userId)
+    {
+        var pickupCode = await _unitOfWork.PickupCodes.GetByIdIgnoreFilterAsync(id);
+        if (pickupCode == null)
+        {
+            return ApiResponse.Fail("取餐码不存在", 404);
+        }
+
+        if (!pickupCode.IsDeleted)
+        {
+            return ApiResponse.Fail("取餐码未被删除，无需恢复");
+        }
+
+        var reservation = await _unitOfWork.Reservations.GetByIdIgnoreFilterAsync(pickupCode.ReservationId);
+        var post = reservation != null ? await _unitOfWork.SharePosts.GetByIdIgnoreFilterAsync(reservation.PostId) : null;
+        if (pickupCode.DeletedBy != userId && (reservation == null || reservation.ClaimerId != userId) && (post == null || post.PosterId != userId))
+        {
+            return ApiResponse.Fail("无权限恢复此取餐码", 403);
+        }
+
+        pickupCode.IsDeleted = false;
+        pickupCode.DeletedAt = null;
+        pickupCode.DeletedBy = null;
+        pickupCode.DeletionReason = null;
+
+        _unitOfWork.PickupCodes.Update(pickupCode);
+        await _unitOfWork.SaveChangesAsync();
+
+        return ApiResponse.Success(null, "取餐码恢复成功");
+    }
+
+    /// <summary>
+    /// 查询回收站取餐码列表
+    /// </summary>
+    public async Task<ApiResponse> GetRecycleBinAsync(int userId, PagedRequest request)
+    {
+        var reservationIds = _unitOfWork.Reservations.GetQueryableIgnoreFilter()
+            .Where(r => r.ClaimerId == userId)
+            .Select(r => r.Id)
+            .ToList();
+
+        var postIds = _unitOfWork.SharePosts.GetQueryableIgnoreFilter()
+            .Where(sp => sp.PosterId == userId)
+            .Select(sp => sp.Id)
+            .ToList();
+
+        var reservationPostIds = _unitOfWork.Reservations.GetQueryableIgnoreFilter()
+            .Where(r => postIds.Contains(r.PostId))
+            .Select(r => r.Id)
+            .ToList();
+
+        var allRelatedReservationIds = reservationIds.Union(reservationPostIds).Distinct().ToList();
+
+        var (items, totalCount) = await _unitOfWork.PickupCodes.GetDeletedPagedAsync(
+            pc => pc.DeletedBy == userId || allRelatedReservationIds.Contains(pc.ReservationId),
+            request.PageNumber, request.PageSize);
+
+        var pickupCodeResponses = _mapper.Map<List<PickupCodeResponse>>(items);
+        var pagedResponse = new PagedResponse<PickupCodeResponse>
+        {
+            Items = pickupCodeResponses,
+            TotalCount = totalCount,
+            PageNumber = request.PageNumber,
+            PageSize = request.PageSize,
+            TotalPages = (int)Math.Ceiling((double)totalCount / request.PageSize)
+        };
+
+        return ApiResponse.Success(pagedResponse);
     }
 }

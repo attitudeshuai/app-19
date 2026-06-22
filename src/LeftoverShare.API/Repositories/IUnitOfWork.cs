@@ -9,5 +9,6 @@ public interface IUnitOfWork
     IKarmaPointRepository KarmaPoints { get; }
     INotificationRepository Notifications { get; }
     IScheduledTaskLogRepository ScheduledTaskLogs { get; }
+    IDeletedEntitySnapshotRepository DeletedEntitySnapshots { get; }
     Task<int> SaveChangesAsync();
 }

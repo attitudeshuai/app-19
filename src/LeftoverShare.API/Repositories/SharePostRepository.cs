@@ -67,4 +67,31 @@ public class SharePostRepository : Repository<SharePost>, ISharePostRepository
                       && sp.Status != Entities.Enums.SharePostStatus.PickedUp)
             .ToListAsync();
     }
+
+    // 获取已删除的帖子（含发布者信息，按用户ID，分页）
+    public async Task<(IEnumerable<SharePost> Items, int TotalCount)> GetDeletedPagedWithDetailsAsync(int userId, int pageNumber, int pageSize)
+    {
+        var query = _dbSet
+            .IgnoreQueryFilters()
+            .Include(sp => sp.Poster)
+            .Where(sp => sp.IsDeleted && sp.PosterId == userId);
+
+        var totalCount = await query.CountAsync();
+        var items = await query
+            .OrderByDescending(sp => sp.DeletedAt)
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        return (items, totalCount);
+    }
+
+    // 根据ID获取帖子（忽略软删除过滤器，含发布者信息）
+    public override async Task<SharePost?> GetByIdIgnoreFilterAsync(int id)
+    {
+        return await _dbSet
+            .IgnoreQueryFilters()
+            .Include(sp => sp.Poster)
+            .FirstOrDefaultAsync(sp => sp.Id == id);
+    }
 }

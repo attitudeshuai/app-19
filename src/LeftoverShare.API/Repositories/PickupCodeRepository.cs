@@ -59,4 +59,31 @@ public class PickupCodeRepository : Repository<PickupCode>, IPickupCodeRepositor
                       && pc.CreatedAt < cutoffTime)
             .ToListAsync();
     }
+
+    // 根据ID获取取餐码（忽略软删除过滤器，含预订、帖子、发布者信息）
+    public override async Task<PickupCode?> GetByIdIgnoreFilterAsync(int id)
+    {
+        return await _dbSet
+            .IgnoreQueryFilters()
+            .Include(pc => pc.Reservation).ThenInclude(r => r.Post).ThenInclude(p => p.Poster)
+            .FirstOrDefaultAsync(pc => pc.Id == id);
+    }
+
+    // 获取已删除的取餐码记录（分页）
+    public new async Task<(IEnumerable<PickupCode> Items, int TotalCount)> GetDeletedPagedAsync(int pageNumber, int pageSize)
+    {
+        var query = _dbSet
+            .IgnoreQueryFilters()
+            .Include(pc => pc.Reservation).ThenInclude(r => r.Post).ThenInclude(p => p.Poster)
+            .Where(pc => pc.IsDeleted);
+
+        var totalCount = await query.CountAsync();
+        var items = await query
+            .OrderByDescending(pc => pc.DeletedAt)
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        return (items, totalCount);
+    }
 }

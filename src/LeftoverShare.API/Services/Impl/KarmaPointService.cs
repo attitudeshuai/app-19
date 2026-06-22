@@ -169,9 +169,73 @@ public class KarmaPointService : IKarmaPointService
             _unitOfWork.Users.Update(user);
         }
 
+        karmaPoint.DeletedBy = karmaPoint.UserId;
+        karmaPoint.DeletionReason = "用户主动删除";
+
         _unitOfWork.KarmaPoints.Delete(karmaPoint);
         await _unitOfWork.SaveChangesAsync();
 
         return ApiResponse.Success(null, "积分记录已删除");
+    }
+
+    /// <summary>
+    /// 从回收站恢复积分记录：恢复TotalKarmaPoints
+    /// </summary>
+    public async Task<ApiResponse> RestoreAsync(int id, int userId)
+    {
+        var karmaPoint = await _unitOfWork.KarmaPoints.GetByIdIgnoreFilterAsync(id);
+        if (karmaPoint == null)
+        {
+            return ApiResponse.Fail("积分记录不存在", 404);
+        }
+
+        if (!karmaPoint.IsDeleted)
+        {
+            return ApiResponse.Fail("积分记录未被删除，无需恢复");
+        }
+
+        if (karmaPoint.DeletedBy != userId && karmaPoint.UserId != userId)
+        {
+            return ApiResponse.Fail("无权限恢复此积分记录", 403);
+        }
+
+        var user = await _unitOfWork.Users.GetByIdAsync(karmaPoint.UserId);
+        if (user != null)
+        {
+            user.TotalKarmaPoints += karmaPoint.Points;
+            _unitOfWork.Users.Update(user);
+        }
+
+        karmaPoint.IsDeleted = false;
+        karmaPoint.DeletedAt = null;
+        karmaPoint.DeletedBy = null;
+        karmaPoint.DeletionReason = null;
+
+        _unitOfWork.KarmaPoints.Update(karmaPoint);
+        await _unitOfWork.SaveChangesAsync();
+
+        return ApiResponse.Success(null, "积分记录恢复成功");
+    }
+
+    /// <summary>
+    /// 查询回收站积分记录列表
+    /// </summary>
+    public async Task<ApiResponse> GetRecycleBinAsync(int userId, PagedRequest request)
+    {
+        var (items, totalCount) = await _unitOfWork.KarmaPoints.GetDeletedPagedAsync(
+            kp => kp.DeletedBy == userId || kp.UserId == userId,
+            request.PageNumber, request.PageSize);
+
+        var karmaPointResponses = _mapper.Map<List<KarmaPointResponse>>(items);
+        var pagedResponse = new PagedResponse<KarmaPointResponse>
+        {
+            Items = karmaPointResponses,
+            TotalCount = totalCount,
+            PageNumber = request.PageNumber,
+            PageSize = request.PageSize,
+            TotalPages = (int)Math.Ceiling((double)totalCount / request.PageSize)
+        };
+
+        return ApiResponse.Success(pagedResponse);
     }
 }

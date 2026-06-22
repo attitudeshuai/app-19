@@ -63,4 +63,22 @@ public interface ISharePostService
     /// <param name="request">更新状态请求参数</param>
     /// <returns>包含更新后帖子信息的响应</returns>
     Task<ApiResponse> UpdateStatusAsync(int id, int userId, UpdateSharePostStatusRequest request);
+
+    /// <summary>
+    /// 从回收站恢复帖子
+    /// 业务意图：恢复已软删除的帖子，检查权限（只能恢复自己删除的或自己拥有的帖子）
+    /// </summary>
+    /// <param name="id">帖子ID</param>
+    /// <param name="userId">操作用户ID</param>
+    /// <returns>操作结果响应</returns>
+    Task<ApiResponse> RestoreAsync(int id, int userId);
+
+    /// <summary>
+    /// 查询回收站帖子列表
+    /// 业务意图：获取当前用户删除的或拥有的已软删除帖子，支持分页
+    /// </summary>
+    /// <param name="userId">用户ID</param>
+    /// <param name="request">分页请求参数</param>
+    /// <returns>包含回收站帖子列表的响应</returns>
+    Task<ApiResponse> GetRecycleBinAsync(int userId, PagedRequest request);
 }

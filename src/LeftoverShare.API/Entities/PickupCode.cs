@@ -7,7 +7,7 @@ namespace LeftoverShare.API.Entities;
 /// <summary>
 /// 取餐码实体
 /// </summary>
-public class PickupCode
+public class PickupCode : ISoftDeletable
 {
     /// <summary>
     /// 取餐码ID
@@ -70,4 +70,25 @@ public class PickupCode
     /// 创建时间
     /// </summary>
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+
+    /// <summary>
+    /// 是否已软删除
+    /// </summary>
+    public bool IsDeleted { get; set; } = false;
+
+    /// <summary>
+    /// 软删除时间
+    /// </summary>
+    public DateTime? DeletedAt { get; set; }
+
+    /// <summary>
+    /// 软删除操作者ID
+    /// </summary>
+    public int? DeletedBy { get; set; }
+
+    /// <summary>
+    /// 删除原因
+    /// </summary>
+    [MaxLength(500)]
+    public string? DeletionReason { get; set; }
 }

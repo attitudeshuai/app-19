@@ -121,10 +121,67 @@ public class SharePostService : ISharePostService
             return ApiResponse.Fail("无权限删除此帖子", 403);
         }
 
+        post.DeletedBy = userId;
+        post.DeletionReason = "用户主动删除";
+
         _unitOfWork.SharePosts.Delete(post);
         await _unitOfWork.SaveChangesAsync();
 
         return ApiResponse.Success(null, "帖子删除成功");
+    }
+
+    /// <summary>
+    /// 从回收站恢复帖子
+    /// </summary>
+    public async Task<ApiResponse> RestoreAsync(int id, int userId)
+    {
+        var post = await _unitOfWork.SharePosts.GetByIdIgnoreFilterAsync(id);
+        if (post == null)
+        {
+            return ApiResponse.Fail("帖子不存在", 404);
+        }
+
+        if (!post.IsDeleted)
+        {
+            return ApiResponse.Fail("帖子未被删除，无需恢复");
+        }
+
+        if (post.DeletedBy != userId && post.PosterId != userId)
+        {
+            return ApiResponse.Fail("无权限恢复此帖子", 403);
+        }
+
+        post.IsDeleted = false;
+        post.DeletedAt = null;
+        post.DeletedBy = null;
+        post.DeletionReason = null;
+
+        _unitOfWork.SharePosts.Update(post);
+        await _unitOfWork.SaveChangesAsync();
+
+        return ApiResponse.Success(null, "帖子恢复成功");
+    }
+
+    /// <summary>
+    /// 查询回收站帖子列表
+    /// </summary>
+    public async Task<ApiResponse> GetRecycleBinAsync(int userId, PagedRequest request)
+    {
+        var (items, totalCount) = await _unitOfWork.SharePosts.GetDeletedPagedAsync(
+            sp => sp.DeletedBy == userId || sp.PosterId == userId,
+            request.PageNumber, request.PageSize);
+
+        var postResponses = _mapper.Map<List<SharePostListResponse>>(items);
+        var pagedResponse = new PagedResponse<SharePostListResponse>
+        {
+            Items = postResponses,
+            TotalCount = totalCount,
+            PageNumber = request.PageNumber,
+            PageSize = request.PageSize,
+            TotalPages = (int)Math.Ceiling((double)totalCount / request.PageSize)
+        };
+
+        return ApiResponse.Success(pagedResponse);
     }
 
     /// <summary>

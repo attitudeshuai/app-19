@@ -59,4 +59,22 @@ public interface IKarmaPointService
     /// <param name="id">积分记录ID</param>
     /// <returns>操作结果响应</returns>
     Task<ApiResponse> DeleteAsync(int id);
+
+    /// <summary>
+    /// 从回收站恢复积分记录
+    /// 业务意图：恢复已软删除的积分记录，检查权限（只能恢复自己删除的或自己拥有的积分记录），同时恢复用户总积分
+    /// </summary>
+    /// <param name="id">积分记录ID</param>
+    /// <param name="userId">操作用户ID</param>
+    /// <returns>操作结果响应</returns>
+    Task<ApiResponse> RestoreAsync(int id, int userId);
+
+    /// <summary>
+    /// 查询回收站积分记录列表
+    /// 业务意图：获取当前用户相关的已软删除积分记录，支持分页
+    /// </summary>
+    /// <param name="userId">用户ID</param>
+    /// <param name="request">分页请求参数</param>
+    /// <returns>包含回收站积分记录列表的响应</returns>
+    Task<ApiResponse> GetRecycleBinAsync(int userId, PagedRequest request);
 }

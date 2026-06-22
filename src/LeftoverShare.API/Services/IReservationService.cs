@@ -64,4 +64,22 @@ public interface IReservationService
     /// <param name="request">更新状态请求参数</param>
     /// <returns>包含更新后预订信息的响应</returns>
     Task<ApiResponse> UpdateStatusAsync(int id, int userId, UpdateReservationStatusRequest request);
+
+    /// <summary>
+    /// 从回收站恢复预订
+    /// 业务意图：恢复已软删除的预订，检查权限（只能恢复自己删除的、自己预订的或自己帖子的预订）
+    /// </summary>
+    /// <param name="id">预订ID</param>
+    /// <param name="userId">操作用户ID</param>
+    /// <returns>操作结果响应</returns>
+    Task<ApiResponse> RestoreAsync(int id, int userId);
+
+    /// <summary>
+    /// 查询回收站预订列表
+    /// 业务意图：获取当前用户相关的已软删除预订，支持分页
+    /// </summary>
+    /// <param name="userId">用户ID</param>
+    /// <param name="request">分页请求参数</param>
+    /// <returns>包含回收站预订列表的响应</returns>
+    Task<ApiResponse> GetRecycleBinAsync(int userId, PagedRequest request);
 }

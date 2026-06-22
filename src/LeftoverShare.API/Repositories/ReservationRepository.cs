@@ -79,4 +79,33 @@ public class ReservationRepository : Repository<Reservation>, IReservationReposi
             .OrderByDescending(r => r.ReservedAt)
             .ToListAsync();
     }
+
+    // 获取已删除的预订记录（按用户ID，分页）
+    public async Task<(IEnumerable<Reservation> Items, int TotalCount)> GetDeletedPagedAsync(int userId, int pageNumber, int pageSize)
+    {
+        var query = _dbSet
+            .IgnoreQueryFilters()
+            .Include(r => r.Post).ThenInclude(p => p.Poster)
+            .Include(r => r.Claimer)
+            .Where(r => r.IsDeleted && (r.ClaimerId == userId || r.Post.PosterId == userId));
+
+        var totalCount = await query.CountAsync();
+        var items = await query
+            .OrderByDescending(r => r.DeletedAt)
+            .Skip((pageNumber - 1) * pageSize)
+            .Take(pageSize)
+            .ToListAsync();
+
+        return (items, totalCount);
+    }
+
+    // 根据ID获取预订（忽略软删除过滤器，含帖子、发布者、领取者信息）
+    public override async Task<Reservation?> GetByIdIgnoreFilterAsync(int id)
+    {
+        return await _dbSet
+            .IgnoreQueryFilters()
+            .Include(r => r.Post).ThenInclude(p => p.Poster)
+            .Include(r => r.Claimer)
+            .FirstOrDefaultAsync(r => r.Id == id);
+    }
 }

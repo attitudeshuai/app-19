@@ -180,6 +180,8 @@ public class ReservationService : IReservationService
         }
 
         reservation.Status = ReservationStatus.Cancelled;
+        reservation.DeletedBy = userId;
+        reservation.DeletionReason = "用户取消预订";
         _unitOfWork.Reservations.Update(reservation);
 
         if (post != null)
@@ -188,9 +190,70 @@ public class ReservationService : IReservationService
             _unitOfWork.SharePosts.Update(post);
         }
 
+        _unitOfWork.Reservations.Delete(reservation);
         await _unitOfWork.SaveChangesAsync();
 
         return ApiResponse.Success(null, "预订已取消");
+    }
+
+    /// <summary>
+    /// 从回收站恢复预订
+    /// </summary>
+    public async Task<ApiResponse> RestoreAsync(int id, int userId)
+    {
+        var reservation = await _unitOfWork.Reservations.GetByIdIgnoreFilterAsync(id);
+        if (reservation == null)
+        {
+            return ApiResponse.Fail("预订不存在", 404);
+        }
+
+        if (!reservation.IsDeleted)
+        {
+            return ApiResponse.Fail("预订未被删除，无需恢复");
+        }
+
+        var post = await _unitOfWork.SharePosts.GetByIdIgnoreFilterAsync(reservation.PostId);
+        if (reservation.DeletedBy != userId && reservation.ClaimerId != userId && post?.PosterId != userId)
+        {
+            return ApiResponse.Fail("无权限恢复此预订", 403);
+        }
+
+        reservation.IsDeleted = false;
+        reservation.DeletedAt = null;
+        reservation.DeletedBy = null;
+        reservation.DeletionReason = null;
+
+        _unitOfWork.Reservations.Update(reservation);
+        await _unitOfWork.SaveChangesAsync();
+
+        return ApiResponse.Success(null, "预订恢复成功");
+    }
+
+    /// <summary>
+    /// 查询回收站预订列表
+    /// </summary>
+    public async Task<ApiResponse> GetRecycleBinAsync(int userId, PagedRequest request)
+    {
+        var postIds = _unitOfWork.SharePosts.GetQueryableIgnoreFilter()
+            .Where(sp => sp.PosterId == userId)
+            .Select(sp => sp.Id)
+            .ToList();
+
+        var (items, totalCount) = await _unitOfWork.Reservations.GetDeletedPagedAsync(
+            r => r.DeletedBy == userId || r.ClaimerId == userId || postIds.Contains(r.PostId),
+            request.PageNumber, request.PageSize);
+
+        var reservationResponses = _mapper.Map<List<ReservationResponse>>(items);
+        var pagedResponse = new PagedResponse<ReservationResponse>
+        {
+            Items = reservationResponses,
+            TotalCount = totalCount,
+            PageNumber = request.PageNumber,
+            PageSize = request.PageSize,
+            TotalPages = (int)Math.Ceiling((double)totalCount / request.PageSize)
+        };
+
+        return ApiResponse.Success(pagedResponse);
     }
 
     /// <summary>
@@ -227,6 +290,11 @@ public class ReservationService : IReservationService
 
         if (newStatus == ReservationStatus.Completed)
         {
+            if (post == null)
+            {
+                return ApiResponse.Fail("关联帖子不存在");
+            }
+
             reservation.PickedUpAt = DateTime.UtcNow;
 
             var karmaPoint = new KarmaPointEntity

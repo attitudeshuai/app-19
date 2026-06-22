@@ -7,7 +7,7 @@ namespace LeftoverShare.API.Entities;
 /// <summary>
 /// 预订实体
 /// </summary>
-public class Reservation
+public class Reservation : ISoftDeletable
 {
     /// <summary>
     /// 预订ID
@@ -84,4 +84,25 @@ public class Reservation
     /// 取餐码导航属性
     /// </summary>
     public virtual PickupCode? PickupCodeNavigation { get; set; }
+
+    /// <summary>
+    /// 是否已软删除
+    /// </summary>
+    public bool IsDeleted { get; set; } = false;
+
+    /// <summary>
+    /// 软删除时间
+    /// </summary>
+    public DateTime? DeletedAt { get; set; }
+
+    /// <summary>
+    /// 软删除操作者ID
+    /// </summary>
+    public int? DeletedBy { get; set; }
+
+    /// <summary>
+    /// 删除原因
+    /// </summary>
+    [MaxLength(500)]
+    public string? DeletionReason { get; set; }
 }

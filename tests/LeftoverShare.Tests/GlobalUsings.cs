@@ -1,4 +1,4 @@
-﻿global using Xunit;
+global using Xunit;
 global using FluentAssertions;
 global using Moq;
 global using Microsoft.EntityFrameworkCore;
@@ -6,8 +6,10 @@ global using AutoMapper;
 global using System.Collections.Concurrent;
 global using LeftoverShare.API.Data;
 global using LeftoverShare.API.Entities;
+global using LeftoverShare.API.Entities.Enums;
 global using LeftoverShare.API.DTOs.Auth;
 global using LeftoverShare.API.DTOs.SharePosts;
+global using LeftoverShare.API.DTOs.Common;
 global using LeftoverShare.API.Helpers;
 global using LeftoverShare.API.Repositories;
 global using LeftoverShare.API.Services;

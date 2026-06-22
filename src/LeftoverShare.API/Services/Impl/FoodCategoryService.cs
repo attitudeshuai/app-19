@@ -101,6 +101,15 @@ public class FoodCategoryService : IFoodCategoryService
             {
                 return ApiResponse.Fail("指定的父级分类不存在");
             }
+
+            try
+            {
+                await _unitOfWork.FoodCategories.GetAllAncestorIdsAsync(request.ParentId.Value);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return ApiResponse.Fail(ex.Message);
+            }
         }
 
         var category = _mapper.Map<FoodCategory>(request);
@@ -138,10 +147,26 @@ public class FoodCategoryService : IFoodCategoryService
             {
                 return ApiResponse.Fail("不能将自己设为父级分类");
             }
+
+            var descendantIds = await _unitOfWork.FoodCategories.GetAllDescendantIdsAsync(id);
+            if (descendantIds.Contains(request.ParentId.Value))
+            {
+                return ApiResponse.Fail("不能将父级分类设置为自身的后代分类（循环引用）");
+            }
+
             var parent = await _unitOfWork.FoodCategories.GetByIdAsync(request.ParentId.Value);
             if (parent == null)
             {
                 return ApiResponse.Fail("指定的父级分类不存在");
+            }
+
+            try
+            {
+                await _unitOfWork.FoodCategories.GetAllAncestorIdsAsync(request.ParentId.Value);
+            }
+            catch (InvalidOperationException ex)
+            {
+                return ApiResponse.Fail(ex.Message);
             }
         }
 

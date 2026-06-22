@@ -58,4 +58,73 @@ public class FoodCategoryRepository : Repository<FoodCategory>, IFoodCategoryRep
     {
         return await _context.SharePosts.AnyAsync(sp => sp.FoodCategoryId == categoryId);
     }
+
+    public async Task<List<int>> GetAllDescendantIdsAsync(int categoryId)
+    {
+        var allCategories = await _dbSet
+            .Where(fc => !fc.IsDeleted)
+            .Select(fc => new { fc.Id, fc.ParentId })
+            .ToListAsync();
+
+        var lookup = allCategories
+            .Where(c => c.ParentId.HasValue)
+            .GroupBy(c => c.ParentId!.Value)
+            .ToDictionary(g => g.Key, g => g.Select(c => c.Id).ToList());
+
+        var descendantIds = new List<int>();
+        var queue = new Queue<int>();
+
+        if (lookup.TryGetValue(categoryId, out var directChildren))
+        {
+            foreach (var childId in directChildren)
+            {
+                queue.Enqueue(childId);
+            }
+        }
+
+        while (queue.Count > 0)
+        {
+            var currentId = queue.Dequeue();
+            descendantIds.Add(currentId);
+
+            if (lookup.TryGetValue(currentId, out var children))
+            {
+                foreach (var childId in children)
+                {
+                    queue.Enqueue(childId);
+                }
+            }
+        }
+
+        return descendantIds;
+    }
+
+    public async Task<List<int>> GetAllAncestorIdsAsync(int categoryId)
+    {
+        var allCategories = await _dbSet
+            .Where(fc => !fc.IsDeleted)
+            .Select(fc => new { fc.Id, fc.ParentId })
+            .ToDictionaryAsync(c => c.Id, c => c.ParentId);
+
+        var ancestorIds = new List<int>();
+        var visited = new HashSet<int>();
+        int? currentId = categoryId;
+
+        while (currentId.HasValue && allCategories.TryGetValue(currentId.Value, out var parentId))
+        {
+            if (!parentId.HasValue)
+                break;
+
+            if (visited.Contains(parentId.Value))
+            {
+                throw new InvalidOperationException($"检测到分类树存在循环引用，分类ID: {parentId.Value}");
+            }
+
+            visited.Add(parentId.Value);
+            ancestorIds.Add(parentId.Value);
+            currentId = parentId.Value;
+        }
+
+        return ancestorIds;
+    }
 }

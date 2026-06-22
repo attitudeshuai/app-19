@@ -1,9 +1,10 @@
 # 分类与标签管理模块 - 数据字典与接口文档
 
-> **模块版本**: v1.0.0
-> **创建日期**: 2025
+> **模块版本**: v1.0.2
+> **最后更新**: 2026-06-22
 > **适用范围**: LeftoverShare 后端 API v1
 > **文档用途**: 提供给前端、移动端及第三方接口调用方的协作参考
+> **⚠️ 重要提示**: 本文档已与实际代码逐行核对，所有「未实现」的设计均已明确标注，请勿依赖标注为「预留设计」的功能
 
 ---
 
@@ -13,9 +14,9 @@
 
 | 对象 | 英文名 | 用途 | 管理权限 |
 |------|--------|------|----------|
-| 食物分类 | FoodCategory | 食物类别的层级分类体系 | 仅管理员 |
-| 过敏原标签 | AllergenTag | 食品安全相关的过敏原警示标签 | 仅管理员 |
-| 帖子标签 | PostTag | 附加在分享帖上的自定义/系统标签 | 管理员+用户(自有标签) |
+| 食物分类 | FoodCategory | 食物类别的层级分类体系 | 仅管理员增删改，查询公开 |
+| 过敏原标签 | AllergenTag | 食品安全相关的过敏原警示标签 | 仅管理员增删改，查询公开 |
+| 帖子标签 | PostTag | 附加在分享帖上的自定义/系统标签 | 系统标签仅管理员，用户标签管理员+创建者 |
 
 ### 1.1 实体关系图（ERD）
 
@@ -47,6 +48,7 @@ SharePost (1) ──────── (N) PostTag
 
 > **Claim 类型**: `http://schemas.microsoft.com/ws/2008/06/identity/claims/role`
 > **JWT Token 中的值**: "User" / "Admin"（字符串形式）
+> **Controller 权限验证方式**: `[Authorize(Roles = "Admin")]`
 
 ---
 
@@ -80,7 +82,10 @@ SharePost (1) ──────── (N) PostTag
 **业务约束**:
 - 自引用树，理论支持无限层级，**建议控制在3级以内**
 - 删除父分类前必须先处理所有子分类（Restrict级联会阻止）
-- 分类被SharePost引用时，删除操作会失败（需先解除引用或改为SetNull）
+- 分类被SharePost引用时，删除操作会失败（需先解除引用）
+- **创建和更新时强制循环引用检测**：
+  - 更新时：父级不能是自己，也不能是自己的任意后代（子/孙/曾孙...）
+  - 创建时：检测父级分类的祖先链是否存在循环引用，确保树结构健康
 
 ---
 
@@ -123,12 +128,12 @@ SharePost (1) ──────── (N) PostTag
 |--------|----------|------|--------|------|------|
 | Id | INT | NO | AUTO | 主键自增 | PK |
 | Name | NVARCHAR(30) | NO | - | 标签名称（展示用） | 必填，最大30字符 |
-| Code | VARCHAR(50) | NO | - | 标签编码（系统标签有，用户标签可自动生成） | 唯一索引 |
+| Code | VARCHAR(50) | NO | - | 标签编码 | 唯一索引，**创建时必填** |
 | Color | VARCHAR(7) | YES | NULL | 标签颜色（HEX格式，如#FF5500） | 正则匹配^#[0-9A-Fa-f]{6}$ |
 | SortOrder | INT | NO | 0 | 显示排序 | ≥0 |
 | Description | NVARCHAR(200) | YES | NULL | 标签用途说明 | 最大200字符 |
 | UsageCount | INT | NO | 0 | 使用次数统计（热门标签排序用） | ≥0 |
-| IsSystemDefined | BIT | NO | 0 | 是否系统预设标签（系统标签仅管理员可改删） | 默认false=用户自定义 |
+| IsSystemDefined | BIT | NO | 0 | 是否系统预设标签 | 默认false=用户自定义 |
 | CreatedBy | INT | YES | NULL | 创建者UserId（系统标签为NULL） | FK→Users.Id，SetNull级联 |
 | IsActive | BIT | NO | 1 | 是否启用 | - |
 | IsDeleted | BIT | NO | 0 | 是否已删除（软删除） | 全局过滤器 |
@@ -160,6 +165,8 @@ SharePost (1) ──────── (N) PostTag
 | SharePostId | INT | NO | 帖子ID | PK, FK→SharePosts.Id (Cascade级联) |
 | AllergenTagId | INT | NO | 过敏原标签ID | PK, FK→AllergenTags.Id (Cascade级联清理关联) |
 
+**⚠️ 预留设计**: 此表结构已在 DbContext 中配置，但 SharePost 创建/编辑接口暂不支持关联过敏原标签，需后续扩展。
+
 ---
 
 ### 3.5 SharePostPostTags（帖子-帖子标签关联表，多对多中间表）
@@ -171,6 +178,8 @@ SharePost (1) ──────── (N) PostTag
 | SharePostId | INT | NO | 帖子ID | PK, FK→SharePosts.Id (Cascade级联) |
 | PostTagId | INT | NO | 帖子标签ID | PK, FK→PostTags.Id (Cascade级联清理关联) |
 
+**⚠️ 预留设计**: 此表结构已在 DbContext 中配置，但 SharePost 创建/编辑接口暂不支持关联帖子标签，需后续扩展。
+
 ---
 
 ### 3.6 Users表（Role字段扩展）
@@ -181,38 +190,50 @@ SharePost (1) ──────── (N) PostTag
 
 ---
 
-## 4. API 接口列表
+## 4. API 接口列表（已与实际代码核对 ✅）
+
+> **路由约定**: Controller 基路径为 `api/[controller]`，即类名去掉"Controller"后缀，**大小写敏感**
+> **权限约定**: `[AllowAnonymous]` = 匿名，`[Authorize]` = 登录用户，`[Authorize(Roles = "Admin")]` = 仅管理员
+
+---
 
 ### 4.1 食物分类（FoodCategories）
 
-> **基础路径**: `GET/POST/PUT/DELETE /api/food-categories`
+> **基路径**: `api/FoodCategories`
 
-| # | 方法 | 路径 | 权限 | 描述 |
-|---|------|------|------|------|
-| 4.1.1 | GET | `/api/food-categories` | 匿名 | 获取分类列表（支持树结构/扁平结构两种模式） |
-| 4.1.2 | GET | `/api/food-categories/{id}` | 匿名 | 获取单个分类详情（含子分类） |
-| 4.1.3 | GET | `/api/food-categories/{id}/children` | 匿名 | 获取指定分类的直接子分类 |
-| 4.1.4 | GET | `/api/food-categories/{id}/path` | 匿名 | 获取从根到当前分类的完整路径链 |
-| 4.1.5 | GET | `/api/food-categories/roots` | 匿名 | 获取所有顶级分类（ParentId=NULL） |
-| 4.1.6 | POST | `/api/food-categories` | Admin | 新增分类 |
-| 4.1.7 | PUT | `/api/food-categories/{id}` | Admin | 更新分类 |
-| 4.1.8 | DELETE | `/api/food-categories/{id}` | Admin | 删除分类（软删除） |
-| 4.1.9 | PATCH | `/api/food-categories/{id}/toggle` | Admin | 启用/停用分类（切换IsActive） |
+| # | 方法 | 路径 | 权限 | 描述 | 实现状态 |
+|---|------|------|------|------|----------|
+| 4.1.1 | GET | `/api/FoodCategories/tree` | 匿名 | 获取分类树（递归嵌套Children） | ✅ 已实现 |
+| 4.1.2 | GET | `/api/FoodCategories/roots` | 匿名 | 获取所有顶级分类（ParentId=NULL） | ✅ 已实现 |
+| 4.1.3 | GET | `/api/FoodCategories/{parentId}/children` | 匿名 | 获取指定分类的直接子分类 | ✅ 已实现 |
+| 4.1.4 | GET | `/api/FoodCategories/{id}` | 匿名 | 获取单个分类详情 | ✅ 已实现 |
+| 4.1.5 | POST | `/api/FoodCategories` | Admin | 新增分类 | ✅ 已实现 |
+| 4.1.6 | PUT | `/api/FoodCategories/{id}` | Admin | 更新分类（含循环引用检测） | ✅ 已实现 |
+| 4.1.7 | DELETE | `/api/FoodCategories/{id}` | Admin | 删除分类（软删除，含子分类/引用检查） | ✅ 已实现 |
+| 4.1.8 | PATCH | `/api/FoodCategories/{id}/toggle-active` | Admin | 启用/禁用分类（切换IsActive） | ✅ 已实现 |
+| 4.1.9 | PATCH | `/api/FoodCategories/sort-order` | Admin | 批量更新排序 | ✅ 已实现 |
+| 4.1.❌ | GET | `/api/FoodCategories` | 匿名 | 获取分类列表（分页） | ❌ 未实现 |
+| 4.1.❌ | GET | `/api/FoodCategories/{id}/path` | 匿名 | 获取从根到当前分类的完整路径链 | ❌ 未实现 |
 
-**GET /api/food-categories 查询参数**:
+**GET /api/FoodCategories/tree 查询参数**:
 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| includeInactive | bool | false | 是否包含已停用的分类（仅管理员可传true） |
-| viewMode | string | "tree" | "tree"=树形结构, "flat"=扁平结构 |
-| parentId | int? | NULL | 仅查询指定父级下的分类（仅flat模式生效） |
-| keyword | string | NULL | 按名称/编码模糊搜索 |
-| sortBy | string | "sortorder" | 排序字段: sortorder/name/createdAt |
-| sortDirection | string | "asc" | 排序方向: asc/desc |
-| pageIndex | int | 1 | 页码（仅flat模式） |
-| pageSize | int | 20 | 每页数量（仅flat模式） |
+| includeInactive | bool | false | 是否包含已停用的分类（仅管理员可传true，但Controller层无限制） |
 
-**POST /api/food-categories 请求体示例**:
+**GET /api/FoodCategories/roots 查询参数**:
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| includeInactive | bool | false | 是否包含已停用的分类 |
+
+**GET /api/FoodCategories/{parentId}/children 查询参数**:
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| includeInactive | bool | false | 是否包含已停用的子分类 |
+
+**POST /api/FoodCategories 请求体示例**:
 ```json
 {
   "name": "素食专享",
@@ -225,74 +246,110 @@ SharePost (1) ──────── (N) PostTag
 }
 ```
 
+**PUT /api/FoodCategories/{id} 循环引用检测逻辑**：
+1. 检测 `request.ParentId == id` → 不能设为自己
+2. 调用 `GetAllDescendantIdsAsync(id)` BFS遍历获取所有后代ID，检测 `request.ParentId` 是否在列表中 → 不能设为自己的子孙后代
+3. 调用 `GetAllAncestorIdsAsync(request.ParentId.Value)` 检测父级祖先链是否存在循环 → 确保父级所在树结构健康
+4. 以上任一检测不通过返回 `400 Bad Request`
+
+**POST /api/FoodCategories 循环引用检测逻辑**：
+1. 调用 `GetAllAncestorIdsAsync(request.ParentId.Value)` 检测父级祖先链是否存在循环 → 确保父级所在树结构健康
+2. 检测不通过返回 `400 Bad Request`
+
 ---
 
 ### 4.2 过敏原标签（AllergenTags）
 
-> **基础路径**: `/api/allergen-tags`
+> **基路径**: `api/AllergenTags`
 
-| # | 方法 | 路径 | 权限 | 描述 |
-|---|------|------|------|------|
-| 4.2.1 | GET | `/api/allergen-tags` | 匿名 | 获取过敏原标签列表（支持按严重程度筛选） |
-| 4.2.2 | GET | `/api/allergen-tags/{id}` | 匿名 | 获取单个标签详情 |
-| 4.2.3 | POST | `/api/allergen-tags` | Admin | 新增过敏原标签 |
-| 4.2.4 | PUT | `/api/allergen-tags/{id}` | Admin | 更新标签 |
-| 4.2.5 | DELETE | `/api/allergen-tags/{id}` | Admin | 删除标签（软删除） |
-| 4.2.6 | PATCH | `/api/allergen-tags/{id}/toggle` | Admin | 启用/停用标签 |
+| # | 方法 | 路径 | 权限 | 描述 | 实现状态 |
+|---|------|------|------|------|----------|
+| 4.2.1 | GET | `/api/AllergenTags/active` | 匿名 | 获取所有已启用的过敏原标签（供前端展示） | ✅ 已实现 |
+| 4.2.2 | GET | `/api/AllergenTags` | **Admin** | 分页获取标签列表（后台管理用） | ✅ 已实现 |
+| 4.2.3 | GET | `/api/AllergenTags/{id}` | 匿名 | 获取单个标签详情 | ✅ 已实现 |
+| 4.2.4 | POST | `/api/AllergenTags` | Admin | 新增过敏原标签 | ✅ 已实现 |
+| 4.2.5 | PUT | `/api/AllergenTags/{id}` | Admin | 更新标签 | ✅ 已实现 |
+| 4.2.6 | DELETE | `/api/AllergenTags/{id}` | Admin | 删除标签（软删除，含引用检查） | ✅ 已实现 |
+| 4.2.7 | PATCH | `/api/AllergenTags/{id}/toggle-active` | Admin | 启用/禁用标签 | ✅ 已实现 |
+| 4.2.8 | PATCH | `/api/AllergenTags/sort-order` | Admin | 批量更新排序 | ✅ 已实现 |
 
-**GET /api/allergen-tags 查询参数**:
+**GET /api/AllergenTags （仅管理员）查询参数**:
 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| includeInactive | bool | false | 包含已停用的（仅管理员） |
+| pageNumber | int | 1 | 页码，≥1 |
+| pageSize | int | 10 | 每页数量，1-100 |
+| includeInactive | bool | false | 是否包含已停用的标签 |
 | severityLevel | int? | NULL | 按严重程度过滤: 1/2/3 |
-| keyword | string | NULL | 按名称/编码搜索 |
-| sortBy | string | "severity" | 排序: severity/sortorder/name/usageCount |
+| searchTerm | string | NULL | 按名称/编码/描述模糊搜索 |
+
+**GET /api/AllergenTags/active 无参数**，返回所有 `IsActive = true` 的标签，按 `SortOrder → SeverityLevel（降序）→ Name` 排序。
 
 ---
 
 ### 4.3 帖子标签（PostTags）
 
-> **基础路径**: `/api/post-tags`
+> **基路径**: `api/PostTags`
 
-| # | 方法 | 路径 | 权限 | 描述 |
-|---|------|------|------|------|
-| 4.3.1 | GET | `/api/post-tags` | 匿名 | 获取标签列表（支持分页/搜索/筛选） |
-| 4.3.2 | GET | `/api/post-tags/{id}` | 匿名 | 获取单个标签详情 |
-| 4.3.3 | GET | `/api/post-tags/popular` | 匿名 | 获取热门标签榜（按UsageCount降序） |
-| 4.3.4 | GET | `/api/post-tags/search` | 匿名 | 搜索标签（供发帖时联想输入） |
-| 4.3.5 | GET | `/api/post-tags/system` | 匿名 | 获取所有系统预设标签 |
-| 4.3.6 | GET | `/api/post-tags/user/mine` | User(本人) | 获取当前登录用户创建的自定义标签 |
-| 4.3.7 | GET | `/api/post-tags/user/{userId}` | Admin | 获取指定用户创建的标签（仅管理员） |
-| 4.3.8 | POST | `/api/post-tags` | User | 新增自定义标签（用户创建自动归属） |
-| 4.3.9 | PUT | `/api/post-tags/{id}` | Admin + Owner | 更新标签（系统标签仅Admin，用户标签需是创建者） |
-| 4.3.10 | DELETE | `/api/post-tags/{id}` | Admin + Owner | 删除标签（同上权限） |
-| 4.3.11 | PATCH | `/api/post-tags/{id}/toggle` | Admin + Owner | 启用/停用标签 |
+| # | 方法 | 路径 | 权限 | 描述 | 实现状态 |
+|---|------|------|------|------|----------|
+| 4.3.1 | GET | `/api/PostTags/active` | 匿名 | 获取所有已启用的标签 | ✅ 已实现 |
+| 4.3.2 | GET | `/api/PostTags/popular` | 匿名 | 获取热门标签榜（按UsageCount降序） | ✅ 已实现 |
+| 4.3.3 | GET | `/api/PostTags/search` | 匿名 | 搜索标签（供发帖时联想输入） | ✅ 已实现 |
+| 4.3.4 | GET | `/api/PostTags` | **Admin** | 分页获取标签列表（后台管理用） | ✅ 已实现 |
+| 4.3.5 | GET | `/api/PostTags/mine` | User | 获取当前登录用户创建的自定义标签 | ✅ 已实现 |
+| 4.3.6 | GET | `/api/PostTags/{id}` | 匿名 | 获取单个标签详情 | ✅ 已实现 |
+| 4.3.7 | POST | `/api/PostTags/system` | Admin | 创建系统预设标签 | ✅ 已实现 |
+| 4.3.8 | POST | `/api/PostTags/user` | User | 用户创建自定义标签（归属当前用户） | ✅ 已实现 |
+| 4.3.9 | PUT | `/api/PostTags/{id}` | Admin + Owner | 更新标签（系统标签仅Admin，用户标签需是创建者） | ✅ 已实现 |
+| 4.3.10 | DELETE | `/api/PostTags/{id}` | Admin + Owner | 删除标签（同上权限，含引用检查） | ✅ 已实现 |
+| 4.3.11 | PATCH | `/api/PostTags/{id}/toggle-active` | Admin | 启用/禁用标签 | ✅ 已实现 |
+| 4.3.12 | PATCH | `/api/PostTags/sort-order` | Admin | 批量更新排序 | ✅ 已实现 |
+| 4.3.❌ | GET | `/api/PostTags/system` | 匿名 | 单独获取系统预设标签列表 | ❌ 未实现（通过分页接口筛选） |
+| 4.3.❌ | GET | `/api/PostTags/user/{userId}` | Admin | 获取指定用户创建的标签 | ❌ 未实现（通过分页接口筛选） |
 
-**GET /api/post-tags 查询参数**:
+**GET /api/PostTags/active 查询参数**:
 
 | 参数 | 类型 | 默认值 | 说明 |
 |------|------|--------|------|
-| scope | string | "all" | all=全部, system=仅系统, user=仅用户自定义 |
-| createdBy | int? | NULL | 仅查询指定用户创建的标签（仅管理员可查他人） |
-| keyword | string | NULL | 按名称/编码模糊搜索 |
-| color | string | NULL | 按颜色HEX精确匹配 |
-| sortBy | string | "usage" | 排序: usage=使用次数/name=名称/createdAt=创建时间 |
-| sortDirection | string | "desc" | asc/desc |
-| pageIndex | int | 1 | 页码 |
-| pageSize | int | 20 | 每页数量 |
-| includeInactive | bool | false | 包含已停用的（仅管理员） |
+| includeUserDefined | bool | true | 是否包含用户自定义标签（false=仅系统标签） |
 
-**POST /api/post-tags 请求体示例**:
+**GET /api/PostTags/popular 查询参数**:
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| topN | int | 20 | 返回数量，1-100 |
+
+**GET /api/PostTags/search 查询参数**:
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| keyword | string | - | **必填**，搜索关键词（空时返回热门） |
+| limit | int | 20 | 返回数量 |
+
+**GET /api/PostTags （仅管理员）查询参数**:
+
+| 参数 | 类型 | 默认值 | 说明 |
+|------|------|--------|------|
+| pageNumber | int | 1 | 页码 |
+| pageSize | int | 10 | 每页数量 |
+| includeInactive | bool | false | 是否包含已停用的标签 |
+| isSystemDefined | bool? | NULL | NULL=全部, true=仅系统, false=仅用户 |
+| createdBy | int? | NULL | 仅查询指定用户创建的标签 |
+| searchTerm | string | NULL | 按名称/编码/描述模糊搜索 |
+
+**POST /api/PostTags/user 请求体示例**:
 ```json
 {
   "name": "学生优先",
-  "code": null,
+  "code": "student_priority",
   "color": "#6366F1",
-  "description": "优先留给在校学生领取"
+  "description": "优先留给在校学生领取",
+  "isActive": true
 }
 ```
-> 用户创建标签时Code可留空，服务端自动生成如 `custom_学生优先_user123_t8k2` 格式的唯一编码。
+
+> **⚠️ 重要说明**: `code` 字段**不可为空**，需由调用方传入，不支持服务端自动生成。
 
 ---
 
@@ -300,53 +357,59 @@ SharePost (1) ──────── (N) PostTag
 
 | 操作 | 匿名用户 | 普通登录用户 | 管理员(Admin) |
 |------|:--------:|:------------:|:-------------:|
-| 查询三类数据（列表/详情/搜索/热门） | ✅ | ✅ | ✅ |
-| 查询系统预设帖子标签 | ✅ | ✅ | ✅ |
-| 查询**自己**创建的自定义标签 | ❌ | ✅ | ✅ |
-| 查询**任意用户**创建的自定义标签 | ❌ | ❌ | ✅ |
+| 查询食物分类（树/顶级/子分类/详情） | ✅ | ✅ | ✅ |
+| 查询过敏原标签（active列表/详情） | ✅ | ✅ | ✅ |
+| 查询帖子标签（active/popular/search/详情） | ✅ | ✅ | ✅ |
+| 查询「我的」自定义帖子标签 | ❌ | ✅（仅自己的） | ✅（全部） |
+| 过敏原/帖子标签后台分页列表 | ❌ | ❌ | ✅ |
 | 创建食物分类/过敏原标签 | ❌ | ❌ | ✅ |
-| 创建用户自定义帖子标签 | ❌ | ✅（归属当前用户） | ✅（可创建系统标签） |
-| 更新**系统定义**的FoodCategory/AllergenTag/PostTag | ❌ | ❌ | ✅ |
-| 更新**自己创建**的用户PostTag | ❌ | ✅ | ✅ |
-| 更新**他人创建**的用户PostTag | ❌ | ❌ | ✅ |
-| 停用/启用任意标签/分类 | ❌ | ❌（自己的可） | ✅ |
-| 软删除任意分类/标签 | ❌ | ❌（自己的可） | ✅ |
-| 回收站操作（恢复/硬删） | ❌ | ❌ | ✅ |
+| 创建系统预设帖子标签 | ❌ | ❌ | ✅ |
+| 创建用户自定义帖子标签 | ❌ | ✅（归属自己） | ✅（可通过/system接口创建系统标签） |
+| 更新**系统定义**的分类/过敏原/帖子标签 | ❌ | ❌ | ✅ |
+| 更新**自己创建**的用户帖子标签 | ❌ | ✅ | ✅ |
+| 更新**他人创建**的用户帖子标签 | ❌ | ❌ | ✅ |
+| 启用/停用任意分类/标签 | ❌ | ❌ | ✅ |
+| 软删除任意分类/标签（含子分类/引用检查） | ❌ | ❌（自己的用户标签可） | ✅ |
+| 批量调整排序 | ❌ | ❌ | ✅ |
 
 ---
 
 ## 6. 数据校验规则（FluentValidation）
 
-所有写操作均在服务端自动执行校验，以下为各字段通用校验规则：
+所有写操作均在服务端自动执行校验，以下为**已实现**的校验规则：
 
-### 6.1 通用校验规则
+### 6.1 已实现的通用校验规则
 
 | 字段 | 适用对象 | 校验规则 |
 |------|----------|----------|
 | Name | 全部三类 | 必填，去空格后非空，最大长度见数据表 |
-| Code | 全部三类（创建时） | 必填（用户PostTag可选），字母开头，仅允许字母、数字、下划线，长度≤50，全局唯一 |
+| Code | 全部三类 | 必填，字母开头，仅允许字母、数字、下划线，长度≤50，全局唯一 |
 | Description | 全部三类 | 若填写，最大长度500字符 |
 | SortOrder | 全部三类 | ≥0的整数 |
-| Color | PostTag | 若填写，必须符合正则 `^#[0-9A-Fa-f]{6}$`，如#FF5500 |
+| Color | PostTag | 若填写，必须符合正则 `^#[0-9A-Fa-f]{6}$` |
 | SeverityLevel | AllergenTag | 必填，值∈[1, 2, 3] |
-| ParentId | FoodCategory | 若填写，必须指向存在且未删除的父分类；**禁止指向自己（防止循环引用）**；禁止指向其子代（防止循环树） |
+| ParentId | FoodCategory（Create和Update时） | 禁止指向自己（仅Update）；禁止指向其任意后代（循环引用检测 ✅ 已实现）；检测父级祖先链是否存在循环 ✅ 已实现 |
 
-### 6.2 业务层附加校验
+### 6.2 业务层附加校验（已实现 ✅）
 
-| 校验场景 | 说明 | 错误码 |
-|----------|------|--------|
-| 食物分类Code重复 | Code必须全局唯一 | CATEGORY_CODE_DUPLICATE |
-| 同层级下食物分类Name重复 | 同一ParentId下子分类名称不能重复 | CATEGORY_NAME_DUPLICATE_SAME_PARENT |
-| 过敏原Code/Name重复 | 全局唯一 | ALLERGEN_DUPLICATE |
-| 系统标签Code/Name重复 | 系统标签名称全局唯一 | POSTTAG_SYSTEM_DUPLICATE |
-| 用户自定义标签与本人其他标签同名 | CreatedBy + Name联合唯一 | POSTTAG_USER_DUPLICATE |
-| 父分类不存在或已删除 | ParentId有效性校验 | PARENT_CATEGORY_NOT_FOUND |
-| 形成循环引用 | 父级不能是自己或后代 | CATEGORY_CYCLE_DETECTED |
-| 删除存在子分类的父分类 | 必须先删除/转移子分类 | CATEGORY_HAS_CHILDREN |
-| 删除被帖子引用的FoodCategory | 需先解除引用（SetNull后删除） | CATEGORY_IN_USE |
-| 尝试修改/删除系统标签但非管理员 | 权限不足 | SYSTEM_TAG_NOT_EDITABLE |
-| 尝试修改/删除他人用户标签非管理员 | 权限不足 | TAG_NOT_OWNER |
-| 停用分类后关联帖子的处理 | 不影响历史关联数据，新发帖时不再展示 | 静默处理 |
+| 校验场景 | 说明 |
+|----------|------|
+| Code重复 | 三类实体创建/更新时均校验全局唯一 |
+| 父分类不存在 | ParentId有效性校验 |
+| 形成循环引用 | 分类更新时检测父级不能是自己或后代（通过 `GetAllDescendantIdsAsync` BFS遍历）；分类创建和更新时检测父级祖先链是否存在循环（通过 `GetAllAncestorIdsAsync` 遍历） |
+| 删除存在子分类的父分类 | 必须先删除/转移所有子分类（`HasChildrenAsync`） |
+| 删除被帖子引用的分类/标签 | 拒绝删除（`IsUsedByPostsAsync`） |
+| 修改/删除系统标签非管理员 | 权限不足，拒绝 |
+| 修改/删除他人用户标签非管理员 | 权限不足，拒绝 |
+
+### 6.3 ⚠️ 预留设计（未实现）
+
+| 校验场景 | 说明 |
+|----------|------|
+| 同层级下食物分类Name重复 | 代码中有此错误码描述，但**未实现**实际校验 |
+| 用户自定义标签与本人其他标签同名 | 代码中有此错误码描述，但**未实现**实际校验 |
+| 过敏原Code/Name重复 | 仅校验了Code重复，**未实现**Name全局唯一校验 |
+| 系统标签Name全局唯一 | 仅校验了Code重复，**未实现**Name全局唯一校验 |
 
 ---
 
@@ -366,7 +429,7 @@ SharePost (1) ──────── (N) PostTag
 
 | code 范围 | 含义 |
 |-----------|------|
-| 20000 - 29999 | 成功（20000=通用成功，20100=创建成功） |
+| 20000 - 29999 | 成功（20000=通用成功） |
 | 40000 - 49999 | 客户端参数校验失败 |
 | 40100 - 40199 | 未认证（未登录或Token过期） |
 | 40300 - 40399 | 无权限（角色不足或非资源所有者） |
@@ -374,28 +437,29 @@ SharePost (1) ──────── (N) PostTag
 | 40900 - 40999 | 业务冲突（重复、循环引用、被引用等） |
 | 50000+ | 服务端内部错误 |
 
-### 7.2 本模块专属错误码
+### 7.2 本模块实际返回的错误信息（非固定错误码）
 
-| 错误码 | HTTP 状态 | 场景 | 建议前端处理 |
-|--------|-----------|------|--------------|
-| 40301 | 403 | 非管理员尝试管理分类/过敏原 | 提示"无权限，需管理员账号" |
-| 40302 | 403 | 非标签创建者尝试修改用户标签 | 提示"只能修改自己创建的标签" |
-| 40303 | 403 | 非管理员尝试修改系统预设标签 | 提示"系统标签仅管理员可编辑" |
-| 40901 | 409 | Code编码已存在 | 聚焦到Code输入框，提示换一个 |
-| 40902 | 409 | 同层级分类名称重复 | 提示"同级分类下名称已存在" |
-| 40903 | 409 | 父分类ID不存在 | 提示"请选择有效的父分类" |
-| 40904 | 409 | 父级设置形成循环引用树 | 提示"不能选择自己的子分类作为父级" |
-| 40905 | 409 | 要删除的分类存在未处理的子分类 | 提示"请先删除或转移所有子分类" |
-| 40906 | 409 | 要删除的分类/标签被帖子引用中 | 弹出二次确认，或先解除引用 |
-| 40907 | 409 | 用户自定义标签与本人已有标签重名 | 提示"你已创建过同名标签" |
+> ⚠️ **重要**: 代码中**未使用固定错误码值**，而是通过 `ApiResponse.Fail(message, httpCode)` 返回。以下为实际返回的错误消息：
+
+| 场景 | 返回的 message | HTTP Status |
+|------|--------------|-------------|
+| 非管理员尝试管理分类/过敏原 | "无权限操作，仅管理员可xxx" | 403 |
+| 非标签创建者尝试修改用户标签 | "无权限操作，仅管理员或标签创建者可修改" | 403 |
+| 非管理员尝试修改系统预设标签 | "系统预设标签仅管理员可修改" | 403 |
+| Code编码已存在 | "标签编码 xxx 已存在" / "已被其他标签使用" | 400 |
+| 父分类ID不存在 | "指定的父级分类不存在" | 400 |
+| 将自己设为父级 | "不能将自己设为父级分类" | 400 |
+| 父级设置形成循环引用树 | "不能将父级分类设置为自身的后代分类（循环引用）" | 400 |
+| 父级分类祖先链存在循环 | "检测到分类树存在循环引用，分类ID: xxx" | 400 |
+| 要删除的分类存在子分类 | "该分类下存在子分类，请先删除子分类" | 400 |
+| 要删除的分类/标签被帖子引用中 | "该标签已被分享帖使用，无法删除（可先禁用）" | 400 |
+| 资源不存在 | "xxx不存在" | 404 |
 
 ---
 
-## 8. 搜索过滤衔接设计（Search & Filter Ready）
+## 8. 搜索过滤衔接设计
 
-为了后续搜索模块的无缝衔接，本模块已预置以下设计：
-
-### 8.1 字段索引覆盖
+### 8.1 已实现的数据库索引
 
 所有高频过滤字段均已建立数据库索引：
 - `FoodCategories.Code`（唯一索引，按编码精确查找）
@@ -406,42 +470,36 @@ SharePost (1) ──────── (N) PostTag
 - `PostTags.CreatedBy`（按创建者筛选）
 - 全部三类实体的 `(IsActive, IsDeleted)` 组合索引
 
-### 8.2 预留查询参数
+### 8.2 ⚠️ 预留设计（未在SharePost接口中实现）
 
-所有列表接口均预留了以下可扩展参数：
+以下为数据层和索引层已预留，但**SharePost业务接口尚未支持**的过滤参数：
 
-| 参数名 | 类型 | 说明 | 搜索模块使用方式 |
-|--------|------|------|------------------|
-| `foodCategoryIds` | int[] | 按食物分类批量过滤（多选） | 前端筛选器勾选项 |
-| `excludeAllergenIds` | int[] | 排除含指定过敏原的帖子（过敏用户保护） | 用户偏好设置自动注入 |
-| `severityLevelGte` | int | 过敏原严重程度≥N | 过敏风险预警 |
-| `postTagIds` | int[] | 按帖子标签批量过滤（OR匹配） | 标签云/兴趣筛选 |
-| `tagScopes` | string[] | 限定标签范围: ["system", "user_custom"] | 只按系统标签过滤 |
-| `categoryPathContains` | int | 筛选某分类及其所有子类（递归树） | 支持"中餐"下川菜/粤菜一并显示 |
-| `inactiveOnly` | bool | 仅查询已停用的（管理员后台） | 数据管理功能 |
+| 参数名 | 类型 | 说明 | 预计实现位置 |
+|--------|------|------|--------------|
+| `foodCategoryId` | int | 按食物分类过滤帖子 | SharePostsController.GetList |
+| `foodCategoryIds` | int[] | 按食物分类批量过滤（多选） | SharePostsController.GetList |
+| `excludeAllergenIds` | int[] | 排除含指定过敏原的帖子 | SharePostsController.GetList |
+| `postTagIds` | int[] | 按帖子标签批量过滤 | SharePostsController.GetList |
+| `categoryPathContains` | int | 筛选某分类及其所有子类（递归树） | SharePostsController.GetList |
 
-### 8.3 热门标签与联想搜索
+### 8.3 UsageCount 维护机制 ⚠️ 预留设计
 
-- **`POST /api/share-posts`（发帖）** 时，前端可异步调用 `GET /api/post-tags/search?keyword=X` 获取联想建议
-- **列表页顶部标签云**：调用 `GET /api/post-tags/popular?topN=30`
-- 所有搜索查询均已支持中文LIKE（EF Core + Pomelo MySQL 兼容）
+**代码中已定义 `UsageCount` 字段并建立索引，但自动增减逻辑尚未实现**，因为：
+- SharePost 创建/编辑接口暂不支持关联标签
+- 缺少中间表维护的触发点
 
-### 8.4 UsageCount 维护机制
+**预计实现方式**：每次帖子关联/取消关联帖子标签时，Service层自动递增/递减：
 
-每次帖子关联/取消关联帖子标签时，Service层自动递增/递减 `PostTags.UsageCount`：
-
-| 场景 | 操作 |
-|------|------|
+| 场景（待实现） | 操作 |
+|--------------|------|
 | 帖子创建时添加X个标签 | X个标签各+1 |
 | 帖子编辑时新增Y个标签 | Y个标签各+1 |
 | 帖子编辑时移除Z个标签 | Z个标签各-1 |
 | 帖子被删除（软删除） | 该帖子所有标签各-1 |
 
-> 此设计保证热门标签榜单基于"当前活跃帖子数"而非历史累计，更加真实有效。
-
 ---
 
-## 9. 种子数据清单（Initializer 预置数据）
+## 9. 种子数据清单（已实现 ✅）
 
 ### 9.1 用户
 
@@ -485,16 +543,16 @@ SharePost (1) ──────── (N) PostTag
 
 | 名称 | Code | 颜色 |
 |------|------|------|
-| 急出 | urgent | #EF4444 红 |
-| 免费 | free | #22C55E 绿 |
-| 限自提 | pickup_only | #3B82F6 蓝 |
-| 可配送 | delivery_available | #8B5CF6 紫 |
-| 素食友好 | vegetarian_friendly | #10B981 翠绿 |
-| 清真 | halal | #06B6D4 青 |
-| 新鲜现做 | fresh_made | #F59E0B 黄 |
-| 量大 | large_quantity | #EC4899 粉 |
-| 冷藏保存 | keep_refrigerated | #0EA5E9 天蓝 |
-| 加热即食 | heat_and_eat | #F97316 橙 |
+| 急出 | urgent | #EF4444 |
+| 免费 | free | #22C55E |
+| 限自提 | pickup_only | #3B82F6 |
+| 可配送 | delivery_available | #8B5CF6 |
+| 素食友好 | vegetarian_friendly | #10B981 |
+| 清真 | halal | #06B6D4 |
+| 新鲜现做 | fresh_made | #F59E0B |
+| 量大 | large_quantity | #EC4899 |
+| 冷藏保存 | keep_refrigerated | #0EA5E9 |
+| 加热即食 | heat_and_eat | #F97316 |
 
 ---
 
@@ -517,7 +575,7 @@ Content-Type: application/json
 ### 10.2 管理员创建食物分类
 
 ```http
-POST /api/food-categories
+POST /api/FoodCategories
 Authorization: Bearer <admin_token>
 Content-Type: application/json
 
@@ -535,14 +593,16 @@ Content-Type: application/json
 ### 10.3 普通用户创建自定义帖子标签
 
 ```http
-POST /api/post-tags
+POST /api/PostTags/user
 Authorization: Bearer <user_token>
 Content-Type: application/json
 
 {
   "name": "学生优先",
+  "code": "student_priority",
   "color": "#6366F1",
-  "description": "优先留给在校学生领取"
+  "description": "优先留给在校学生领取",
+  "isActive": true
 }
 ```
 
@@ -554,7 +614,7 @@ Content-Type: application/json
 |------|------|
 | **向后兼容** | SharePost.FoodType 字符串字段**保留**，用于过渡期展示，新接口应使用 FoodCategoryId |
 | **字段扩展** | 所有实体预留了 Description 字段，可承载附加元信息，无需频繁改表 |
-| **编码优先** | 所有业务筛选、权限判断、前后端约定的固定值均通过 Code 字段，Id仅用于数据库关联（避免硬编码ID） |
+| **编码优先** | 所有业务筛选、权限判断、前后端约定的固定值均通过 Code 字段，Id仅用于数据库关联 |
 | **软删除优先** | 所有删除操作默认软删除，数据可在回收站（RecycleBin）模块恢复 |
 
 ---
@@ -567,17 +627,43 @@ Content-Type: application/json
 | 实体 | [AllergenTag.cs](../src/LeftoverShare.API/Entities/AllergenTag.cs) | 过敏原标签实体 |
 | 实体 | [PostTag.cs](../src/LeftoverShare.API/Entities/PostTag.cs) | 帖子标签实体 |
 | 枚举 | [UserRole.cs](../src/LeftoverShare.API/Entities/Enums/UserRole.cs) | 用户角色枚举 |
+| 循环引用检测（后代） | [FoodCategoryRepository.cs](../src/LeftoverShare.API/Repositories/FoodCategoryRepository.cs#L62-L100) | `GetAllDescendantIdsAsync` BFS遍历实现 |
+| 循环引用检测（祖先） | [FoodCategoryRepository.cs](../src/LeftoverShare.API/Repositories/FoodCategoryRepository.cs#L102-L130) | `GetAllAncestorIdsAsync` 向上遍历实现 |
 | DbContext | [AppDbContext.cs](../src/LeftoverShare.API/Data/AppDbContext.cs) | 表结构FluentAPI配置 |
 | 初始化 | [DbInitializer.cs](../src/LeftoverShare.API/Data/DbInitializer.cs) | 种子数据逻辑 |
 | 控制器 | [FoodCategoriesController.cs](../src/LeftoverShare.API/Controllers/FoodCategoriesController.cs) | 分类API |
 | 控制器 | [AllergenTagsController.cs](../src/LeftoverShare.API/Controllers/AllergenTagsController.cs) | 过敏原API |
 | 控制器 | [PostTagsController.cs](../src/LeftoverShare.API/Controllers/PostTagsController.cs) | 帖子标签API |
-| 服务实现 | [FoodCategoryService.cs](../src/LeftoverShare.API/Services/Impl/FoodCategoryService.cs) | 业务逻辑（权限校验/循环检测） |
+| 服务实现 | [FoodCategoryService.cs](../src/LeftoverShare.API/Services/Impl/FoodCategoryService.cs#L97-L113) | 创建时循环引用检测逻辑 |
+| 服务实现 | [FoodCategoryService.cs](../src/LeftoverShare.API/Services/Impl/FoodCategoryService.cs#L144-L171) | 更新时循环引用检测逻辑 |
 | 服务实现 | [AllergenTagService.cs](../src/LeftoverShare.API/Services/Impl/AllergenTagService.cs) | 业务逻辑 |
 | 服务实现 | [PostTagService.cs](../src/LeftoverShare.API/Services/Impl/PostTagService.cs) | 业务逻辑（双重所有者权限） |
 | DTO验证 | */Validators/* 目录下6个Validator | FluentValidation规则 |
 
 ---
 
+## 13. 本次修复内容记录（v1.0.0 → v1.0.2）
+
+### v1.0.1 → v1.0.2（本次补充修复）
+
+| # | 修复内容 | 相关文件 |
+|---|----------|----------|
+| 1 | **创建时循环引用检测**：在 `CreateAsync` 中添加父级祖先链循环引用检测，确保新分类的父级所在树结构健康 | [FoodCategoryService.cs](../src/LeftoverShare.API/Services/Impl/FoodCategoryService.cs#L97-L113) |
+| 2 | **祖先链检测方法**：新增 `GetAllAncestorIdsAsync` 方法，向上遍历祖先链并检测循环 | [IFoodCategoryRepository.cs](../src/LeftoverShare.API/Repositories/IFoodCategoryRepository.cs#L46-L50)、[FoodCategoryRepository.cs](../src/LeftoverShare.API/Repositories/FoodCategoryRepository.cs#L102-L130) |
+| 3 | **更新时祖先链检测**：在 `UpdateAsync` 中也加入祖先链健康检测，双重保障 | [FoodCategoryService.cs](../src/LeftoverShare.API/Services/Impl/FoodCategoryService.cs#L163-L170) |
+| 4 | **文档更新**：补充创建时的检测逻辑说明，更新版本号至v1.0.2 | [006_category_and_tag_module.md](../docs/006_category_and_tag_module.md) |
+
+---
+
+### v1.0.0 → v1.0.1（之前修复）
+
+| # | 修复内容 | 相关文件 |
+|---|----------|----------|
+| 1 | **食物分类循环引用检测**：更新分类时检测父级不能是自身或任意后代（BFS遍历所有后代ID） | [FoodCategoryService.cs](../src/LeftoverShare.API/Services/Impl/FoodCategoryService.cs#L144-L155)、[FoodCategoryRepository.cs](../src/LeftoverShare.API/Repositories/FoodCategoryRepository.cs#L62-L100) |
+| 2 | **接口权限收紧**：`GET /api/AllergenTags` 和 `GET /api/PostTags` 分页列表接口从 `[Authorize]` 改为 `[Authorize(Roles = "Admin")]`，所有写操作接口也统一明确角色 | 三个Controller的所有写操作接口 |
+| 3 | **文档修正**：对照实际代码逐行核对，删除11个未实现的接口描述，标注所有「预留设计」功能，修正所有接口路径和参数 | [006_category_and_tag_module.md](../docs/006_category_and_tag_module.md) |
+
+---
+
 > **文档维护责任人**: 后端团队
-> **下次审核日期**: 搜索过滤模块上线后
+> **审核状态**: ✅ 已与实际代码逐行核对

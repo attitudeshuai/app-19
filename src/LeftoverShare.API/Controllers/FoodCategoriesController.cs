@@ -68,10 +68,10 @@ public class FoodCategoriesController : ControllerBase
     }
 
     /// <summary>
-    /// 创建分类（管理员）
+    /// 创建分类（仅管理员）
     /// </summary>
     [HttpPost]
-    [Authorize]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Create([FromBody] CreateFoodCategoryRequest request)
     {
         var userId = _currentUser.UserId;
@@ -84,10 +84,10 @@ public class FoodCategoriesController : ControllerBase
     }
 
     /// <summary>
-    /// 更新分类（管理员）
+    /// 更新分类（仅管理员）
     /// </summary>
     [HttpPut("{id}")]
-    [Authorize]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateFoodCategoryRequest request)
     {
         var userId = _currentUser.UserId;
@@ -100,10 +100,10 @@ public class FoodCategoriesController : ControllerBase
     }
 
     /// <summary>
-    /// 删除分类（管理员，软删除
+    /// 删除分类（仅管理员，软删除）
     /// </summary>
     [HttpDelete("{id}")]
-    [Authorize]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> Delete(int id)
     {
         var userId = _currentUser.UserId;
@@ -116,10 +116,10 @@ public class FoodCategoriesController : ControllerBase
     }
 
     /// <summary>
-    /// 启用/禁用分类（管理员）
+    /// 启用/禁用分类（仅管理员）
     /// </summary>
     [HttpPatch("{id}/toggle-active")]
-    [Authorize]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> ToggleActive(int id, [FromBody] bool isActive)
     {
         var userId = _currentUser.UserId;
@@ -132,10 +132,10 @@ public class FoodCategoriesController : ControllerBase
     }
 
     /// <summary>
-    /// 批量更新排序（管理员）
+    /// 批量更新排序（仅管理员）
     /// </summary>
     [HttpPatch("sort-order")]
-    [Authorize]
+    [Authorize(Roles = "Admin")]
     public async Task<IActionResult> UpdateSortOrder([FromBody] Dictionary<int, int> sortOrders)
     {
         var userId = _currentUser.UserId;

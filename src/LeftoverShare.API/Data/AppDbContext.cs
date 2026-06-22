@@ -37,6 +37,16 @@ public class AppDbContext : DbContext
     public DbSet<ScheduledTaskLog> ScheduledTaskLogs => Set<ScheduledTaskLog>();
     // 软删除审计快照表
     public DbSet<DeletedEntitySnapshot> DeletedEntitySnapshots => Set<DeletedEntitySnapshot>();
+    // 食物分类表
+    public DbSet<FoodCategory> FoodCategories => Set<FoodCategory>();
+    // 过敏原标签表
+    public DbSet<AllergenTag> AllergenTags => Set<AllergenTag>();
+    // 帖子标签表
+    public DbSet<PostTag> PostTags => Set<PostTag>();
+    // 分享帖-过敏原标签关联表
+    public DbSet<SharePostAllergenTag> SharePostAllergenTags => Set<SharePostAllergenTag>();
+    // 分享帖-帖子标签关联表
+    public DbSet<SharePostPostTag> SharePostPostTags => Set<SharePostPostTag>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -69,6 +79,12 @@ public class AppDbContext : DbContext
 
             entity.Property(u => u.Avatar)
                   .HasMaxLength(200);
+
+            entity.Property(u => u.Role)
+                  .IsRequired()
+                  .HasConversion<string>()
+                  .HasMaxLength(20)
+                  .HasDefaultValue(Entities.Enums.UserRole.User);
 
             // 使用 MySQL 的 NOW() 函数作为默认值
             entity.Property(u => u.CreatedAt)
@@ -108,6 +124,10 @@ public class AppDbContext : DbContext
             // 位置索引
             entity.HasIndex(sp => new { sp.Latitude, sp.Longitude })
                   .HasDatabaseName("IX_SharePosts_Location");
+
+            // 食物分类索引
+            entity.HasIndex(sp => sp.FoodCategoryId)
+                  .HasDatabaseName("IX_SharePosts_FoodCategoryId");
 
             // 软删除索引
             entity.HasIndex(sp => new { sp.IsDeleted, sp.DeletedAt })
@@ -166,6 +186,12 @@ public class AppDbContext : DbContext
                   .WithOne(r => r.Post)
                   .HasForeignKey(r => r.PostId)
                   .OnDelete(DeleteBehavior.Cascade);
+
+            // 帖子与食物分类：多对一
+            entity.HasOne(sp => sp.FoodCategory)
+                  .WithMany(fc => fc.SharePosts)
+                  .HasForeignKey(sp => sp.FoodCategoryId)
+                  .OnDelete(DeleteBehavior.SetNull);
 
             // 全局查询过滤器：自动过滤已软删除的记录
             entity.HasQueryFilter(sp => !sp.IsDeleted);
@@ -423,6 +449,221 @@ public class AppDbContext : DbContext
                   .HasForeignKey(des => des.DeletedBy)
                   .OnDelete(DeleteBehavior.Restrict);
         });
+
+        // ===== 食物分类实体配置 =====
+        modelBuilder.Entity<FoodCategory>(entity =>
+        {
+            entity.HasKey(fc => fc.Id);
+
+            entity.HasIndex(fc => fc.Code)
+                  .IsUnique()
+                  .HasDatabaseName("IX_FoodCategories_Code");
+
+            entity.HasIndex(fc => new { fc.ParentId, fc.SortOrder })
+                  .HasDatabaseName("IX_FoodCategories_ParentId_SortOrder");
+
+            entity.HasIndex(fc => new { fc.IsDeleted, fc.IsActive })
+                  .HasDatabaseName("IX_FoodCategories_IsDeleted_IsActive");
+
+            entity.Property(fc => fc.Name)
+                  .IsRequired()
+                  .HasMaxLength(50);
+
+            entity.Property(fc => fc.Code)
+                  .IsRequired()
+                  .HasMaxLength(50);
+
+            entity.Property(fc => fc.IconUrl)
+                  .HasMaxLength(500);
+
+            entity.Property(fc => fc.SortOrder)
+                  .HasDefaultValue(0);
+
+            entity.Property(fc => fc.Description)
+                  .HasMaxLength(200);
+
+            entity.Property(fc => fc.IsActive)
+                  .HasDefaultValue(true);
+
+            entity.Property(fc => fc.IsDeleted)
+                  .HasDefaultValue(false);
+
+            entity.Property(fc => fc.DeletionReason)
+                  .HasMaxLength(500);
+
+            entity.Property(fc => fc.CreatedAt)
+                  .HasColumnType("timestamp").HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            entity.Property(fc => fc.UpdatedAt)
+                  .HasColumnType("timestamp").HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            entity.HasOne(fc => fc.Parent)
+                  .WithMany(fc => fc.Children)
+                  .HasForeignKey(fc => fc.ParentId)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasQueryFilter(fc => !fc.IsDeleted);
+        });
+
+        // ===== 过敏原标签实体配置 =====
+        modelBuilder.Entity<AllergenTag>(entity =>
+        {
+            entity.HasKey(at => at.Id);
+
+            entity.HasIndex(at => at.Code)
+                  .IsUnique()
+                  .HasDatabaseName("IX_AllergenTags_Code");
+
+            entity.HasIndex(at => new { at.IsDeleted, at.IsActive })
+                  .HasDatabaseName("IX_AllergenTags_IsDeleted_IsActive");
+
+            entity.Property(at => at.Name)
+                  .IsRequired()
+                  .HasMaxLength(50);
+
+            entity.Property(at => at.Code)
+                  .IsRequired()
+                  .HasMaxLength(50);
+
+            entity.Property(at => at.IconUrl)
+                  .HasMaxLength(500);
+
+            entity.Property(at => at.SeverityLevel)
+                  .IsRequired()
+                  .HasDefaultValue(2);
+
+            entity.Property(at => at.Description)
+                  .HasMaxLength(500);
+
+            entity.Property(at => at.SortOrder)
+                  .HasDefaultValue(0);
+
+            entity.Property(at => at.IsActive)
+                  .HasDefaultValue(true);
+
+            entity.Property(at => at.IsDeleted)
+                  .HasDefaultValue(false);
+
+            entity.Property(at => at.DeletionReason)
+                  .HasMaxLength(500);
+
+            entity.Property(at => at.CreatedAt)
+                  .HasColumnType("timestamp").HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            entity.Property(at => at.UpdatedAt)
+                  .HasColumnType("timestamp").HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            entity.HasQueryFilter(at => !at.IsDeleted);
+        });
+
+        // ===== 帖子标签实体配置 =====
+        modelBuilder.Entity<PostTag>(entity =>
+        {
+            entity.HasKey(pt => pt.Id);
+
+            entity.HasIndex(pt => pt.Code)
+                  .IsUnique()
+                  .HasDatabaseName("IX_PostTags_Code");
+
+            entity.HasIndex(pt => new { pt.IsDeleted, pt.IsActive })
+                  .HasDatabaseName("IX_PostTags_IsDeleted_IsActive");
+
+            entity.HasIndex(pt => pt.UsageCount)
+                  .HasDatabaseName("IX_PostTags_UsageCount");
+
+            entity.Property(pt => pt.Name)
+                  .IsRequired()
+                  .HasMaxLength(30);
+
+            entity.Property(pt => pt.Code)
+                  .IsRequired()
+                  .HasMaxLength(30);
+
+            entity.Property(pt => pt.Color)
+                  .HasMaxLength(20)
+                  .HasDefaultValue("#3B82F6");
+
+            entity.Property(pt => pt.IconUrl)
+                  .HasMaxLength(500);
+
+            entity.Property(pt => pt.Description)
+                  .HasMaxLength(200);
+
+            entity.Property(pt => pt.UsageCount)
+                  .HasDefaultValue(0);
+
+            entity.Property(pt => pt.IsSystemDefined)
+                  .HasDefaultValue(false);
+
+            entity.Property(pt => pt.SortOrder)
+                  .HasDefaultValue(0);
+
+            entity.Property(pt => pt.IsActive)
+                  .HasDefaultValue(true);
+
+            entity.Property(pt => pt.IsDeleted)
+                  .HasDefaultValue(false);
+
+            entity.Property(pt => pt.DeletionReason)
+                  .HasMaxLength(500);
+
+            entity.Property(pt => pt.CreatedAt)
+                  .HasColumnType("timestamp").HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            entity.Property(pt => pt.UpdatedAt)
+                  .HasColumnType("timestamp").HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            entity.HasOne(pt => pt.CreatedByUser)
+                  .WithMany(u => u.CreatedPostTags)
+                  .HasForeignKey(pt => pt.CreatedBy)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasQueryFilter(pt => !pt.IsDeleted);
+        });
+
+        // ===== 分享帖-过敏原标签关联实体配置 =====
+        modelBuilder.Entity<SharePostAllergenTag>(entity =>
+        {
+            entity.HasKey(spat => new { spat.SharePostId, spat.AllergenTagId });
+
+            entity.HasIndex(spat => spat.AllergenTagId)
+                  .HasDatabaseName("IX_SharePostAllergenTags_AllergenTagId");
+
+            entity.Property(spat => spat.CreatedAt)
+                  .HasColumnType("timestamp").HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            entity.HasOne(spat => spat.SharePost)
+                  .WithMany(sp => sp.SharePostAllergenTags)
+                  .HasForeignKey(spat => spat.SharePostId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(spat => spat.AllergenTag)
+                  .WithMany(at => at.SharePostAllergenTags)
+                  .HasForeignKey(spat => spat.AllergenTagId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
+
+        // ===== 分享帖-帖子标签关联实体配置 =====
+        modelBuilder.Entity<SharePostPostTag>(entity =>
+        {
+            entity.HasKey(sppt => new { sppt.SharePostId, sppt.PostTagId });
+
+            entity.HasIndex(sppt => sppt.PostTagId)
+                  .HasDatabaseName("IX_SharePostPostTags_PostTagId");
+
+            entity.Property(sppt => sppt.CreatedAt)
+                  .HasColumnType("timestamp").HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            entity.HasOne(sppt => sppt.SharePost)
+                  .WithMany(sp => sp.SharePostPostTags)
+                  .HasForeignKey(sppt => sppt.SharePostId)
+                  .OnDelete(DeleteBehavior.Cascade);
+
+            entity.HasOne(sppt => sppt.PostTag)
+                  .WithMany(pt => pt.SharePostPostTags)
+                  .HasForeignKey(sppt => sppt.PostTagId)
+                  .OnDelete(DeleteBehavior.Cascade);
+        });
     }
 
     public override int SaveChanges()
@@ -511,6 +752,9 @@ public class AppDbContext : DbContext
             Reservation r => $"预约 #{r.Id} - 帖子#{r.PostId} by 用户#{r.ClaimerId}",
             PickupCode pc => $"取餐码 #{pc.Id} - {pc.Code}",
             KarmaPoint kp => $"积分流水 #{kp.Id} - 用户#{kp.UserId} {kp.Points}分",
+            FoodCategory fc => $"食物分类 #{fc.Id} - {fc.Name}",
+            AllergenTag at => $"过敏原标签 #{at.Id} - {at.Name}",
+            PostTag pt => $"帖子标签 #{pt.Id} - {pt.Name}",
             _ => $"{entity.GetType().Name} #{entry.Property("Id").CurrentValue}"
         };
     }
@@ -523,6 +767,9 @@ public class AppDbContext : DbContext
             Reservation r => r.ClaimerId,
             PickupCode pc => null,
             KarmaPoint kp => kp.UserId,
+            FoodCategory fc => null,
+            AllergenTag at => null,
+            PostTag pt => pt.CreatedBy,
             _ => null
         };
     }

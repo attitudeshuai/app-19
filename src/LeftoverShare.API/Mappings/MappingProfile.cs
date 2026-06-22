@@ -4,6 +4,9 @@ using LeftoverShare.API.DTOs.KarmaPoints;
 using LeftoverShare.API.DTOs.PickupCodes;
 using LeftoverShare.API.DTOs.Reservations;
 using LeftoverShare.API.DTOs.SharePosts;
+using LeftoverShare.API.DTOs.FoodCategories;
+using LeftoverShare.API.DTOs.AllergenTags;
+using LeftoverShare.API.DTOs.PostTags;
 using LeftoverShare.API.Entities;
 using LeftoverShare.API.Helpers;
 using System.Text.Json;
@@ -25,7 +28,8 @@ public class MappingProfile : Profile
     {
         // 用户实体 → 用户响应DTO
         CreateMap<User, UserResponse>()
-            .ForMember(dest => dest.TotalKarmaPoints, opt => opt.MapFrom(src => src.KarmaPoints.Sum(kp => kp.Points)));
+            .ForMember(dest => dest.TotalKarmaPoints, opt => opt.MapFrom(src => src.KarmaPoints.Sum(kp => kp.Points)))
+            .ForMember(dest => dest.Role, opt => opt.MapFrom(src => src.Role.ToString()));
 
         // 分享帖实体 → 分享帖详情响应DTO
         CreateMap<SharePost, SharePostResponse>()
@@ -83,6 +87,23 @@ public class MappingProfile : Profile
 
         // 更新积分请求DTO → 积分实体
         CreateMap<UpdateKarmaPointRequest, KarmaPoint>();
+
+        // ===== 食物分类映射 =====
+        CreateMap<FoodCategory, FoodCategoryResponse>()
+            .ForMember(dest => dest.PostCount, opt => opt.MapFrom(src => src.SharePosts.Count));
+        CreateMap<CreateFoodCategoryRequest, FoodCategory>();
+        CreateMap<UpdateFoodCategoryRequest, FoodCategory>();
+
+        // ===== 过敏原标签映射 =====
+        CreateMap<AllergenTag, AllergenTagResponse>();
+        CreateMap<CreateAllergenTagRequest, AllergenTag>();
+        CreateMap<UpdateAllergenTagRequest, AllergenTag>();
+
+        // ===== 帖子标签映射 =====
+        CreateMap<PostTag, PostTagResponse>()
+            .ForMember(dest => dest.CreatedByUsername, opt => opt.MapFrom(src => src.CreatedByUser != null ? src.CreatedByUser.Username : null));
+        CreateMap<CreatePostTagRequest, PostTag>();
+        CreateMap<UpdatePostTagRequest, PostTag>();
     }
 
     /// <summary>

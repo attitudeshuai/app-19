@@ -10,5 +10,8 @@ public interface IUnitOfWork
     INotificationRepository Notifications { get; }
     IScheduledTaskLogRepository ScheduledTaskLogs { get; }
     IDeletedEntitySnapshotRepository DeletedEntitySnapshots { get; }
+    IFoodCategoryRepository FoodCategories { get; }
+    IAllergenTagRepository AllergenTags { get; }
+    IPostTagRepository PostTags { get; }
     Task<int> SaveChangesAsync();
 }

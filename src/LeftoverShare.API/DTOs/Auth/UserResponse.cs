@@ -8,4 +8,5 @@ public class UserResponse
     public string? Avatar { get; set; }
     public DateTime CreatedAt { get; set; }
     public int TotalKarmaPoints { get; set; }
+    public string Role { get; set; } = "User";
 }

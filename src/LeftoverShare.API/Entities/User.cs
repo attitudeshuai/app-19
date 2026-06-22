@@ -1,5 +1,6 @@
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using LeftoverShare.API.Entities.Enums;
 
 namespace LeftoverShare.API.Entities;
 
@@ -54,6 +55,12 @@ public class User
     public string? Address { get; set; }
 
     /// <summary>
+    /// 用户角色
+    /// </summary>
+    [Required]
+    public UserRole Role { get; set; } = UserRole.User;
+
+    /// <summary>
     /// 总积分
     /// </summary>
     public int TotalKarmaPoints { get; set; } = 0;
@@ -87,4 +94,9 @@ public class User
     /// 积分记录
     /// </summary>
     public virtual ICollection<KarmaPoint> KarmaPoints { get; set; } = new List<KarmaPoint>();
+
+    /// <summary>
+    /// 创建的帖子标签（仅用户自定义标签）
+    /// </summary>
+    public virtual ICollection<PostTag> CreatedPostTags { get; set; } = new List<PostTag>();
 }

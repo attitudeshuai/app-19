@@ -42,7 +42,18 @@ public class SharePost : ISoftDeletable
     public string Description { get; set; } = string.Empty;
 
     /// <summary>
-    /// 食物类型
+    /// 食物分类ID（外键）
+    /// </summary>
+    [ForeignKey(nameof(FoodCategory))]
+    public int? FoodCategoryId { get; set; }
+
+    /// <summary>
+    /// 食物分类
+    /// </summary>
+    public virtual FoodCategory? FoodCategory { get; set; }
+
+    /// <summary>
+    /// 食物类型（旧字段，保留用于兼容）
     /// </summary>
     [Required]
     [MaxLength(50)]
@@ -111,6 +122,16 @@ public class SharePost : ISoftDeletable
     /// 预订记录
     /// </summary>
     public virtual ICollection<Reservation> Reservations { get; set; } = new List<Reservation>();
+
+    /// <summary>
+    /// 过敏原标签关联
+    /// </summary>
+    public virtual ICollection<SharePostAllergenTag> SharePostAllergenTags { get; set; } = new List<SharePostAllergenTag>();
+
+    /// <summary>
+    /// 帖子标签关联
+    /// </summary>
+    public virtual ICollection<SharePostPostTag> SharePostPostTags { get; set; } = new List<SharePostPostTag>();
 
     /// <summary>
     /// 是否已软删除

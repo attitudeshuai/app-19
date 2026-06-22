@@ -65,9 +65,11 @@ public class User
     /// </summary>
     public int TotalKarmaPoints { get; set; } = 0;
 
-    /// <summary>
-    /// 是否激活
-    /// </summary>
+    [Column(TypeName = "decimal(5, 2)")]
+    public decimal ReputationScore { get; set; } = 50m;
+
+    public int ReceivedReviewCount { get; set; } = 0;
+
     public bool IsActive { get; set; } = true;
 
     /// <summary>

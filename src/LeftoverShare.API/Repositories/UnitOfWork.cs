@@ -17,6 +17,8 @@ public class UnitOfWork : IUnitOfWork
     public IFoodCategoryRepository FoodCategories { get; private set; }
     public IAllergenTagRepository AllergenTags { get; private set; }
     public IPostTagRepository PostTags { get; private set; }
+    public IReviewRepository Reviews { get; private set; }
+    public IPublisherReputationRepository PublisherReputations { get; private set; }
 
     public UnitOfWork(AppDbContext context)
     {
@@ -32,6 +34,8 @@ public class UnitOfWork : IUnitOfWork
         FoodCategories = new FoodCategoryRepository(_context);
         AllergenTags = new AllergenTagRepository(_context);
         PostTags = new PostTagRepository(_context);
+        Reviews = new ReviewRepository(_context);
+        PublisherReputations = new PublisherReputationRepository(_context);
     }
 
     public async Task<int> SaveChangesAsync()

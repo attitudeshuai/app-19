@@ -47,6 +47,8 @@ public class AppDbContext : DbContext
     public DbSet<SharePostAllergenTag> SharePostAllergenTags => Set<SharePostAllergenTag>();
     // 分享帖-帖子标签关联表
     public DbSet<SharePostPostTag> SharePostPostTags => Set<SharePostPostTag>();
+    public DbSet<Review> Reviews => Set<Review>();
+    public DbSet<PublisherReputation> PublisherReputations => Set<PublisherReputation>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -92,6 +94,13 @@ public class AppDbContext : DbContext
 
             entity.Property(u => u.UpdatedAt)
                   .HasColumnType("timestamp").HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            entity.Property(u => u.ReputationScore)
+                  .HasColumnType("decimal(5,2)")
+                  .HasDefaultValue(50m);
+
+            entity.Property(u => u.ReceivedReviewCount)
+                  .HasDefaultValue(0);
 
             // 用户与分享帖子：一对多
             entity.HasMany(u => u.SharePosts)
@@ -664,6 +673,128 @@ public class AppDbContext : DbContext
                   .HasForeignKey(sppt => sppt.PostTagId)
                   .OnDelete(DeleteBehavior.Cascade);
         });
+
+        modelBuilder.Entity<Review>(entity =>
+        {
+            entity.HasKey(r => r.Id);
+
+            entity.HasIndex(r => new { r.ReservationId, r.ReviewerId })
+                  .IsUnique()
+                  .HasDatabaseName("IX_Reviews_ReservationId_ReviewerId");
+
+            entity.HasIndex(r => new { r.PublisherId, r.Status, r.CreatedAt })
+                  .HasDatabaseName("IX_Reviews_PublisherId_Status_CreatedAt");
+
+            entity.HasIndex(r => new { r.SharePostId, r.CreatedAt })
+                  .HasDatabaseName("IX_Reviews_SharePostId_CreatedAt");
+
+            entity.HasIndex(r => new { r.ReviewerId, r.CreatedAt })
+                  .HasDatabaseName("IX_Reviews_ReviewerId_CreatedAt");
+
+            entity.HasIndex(r => new { r.ReviewerIp, r.CreatedAt })
+                  .HasDatabaseName("IX_Reviews_ReviewerIp_CreatedAt");
+
+            entity.HasIndex(r => new { r.IsDeleted, r.DeletedAt })
+                  .HasDatabaseName("IX_Reviews_IsDeleted_DeletedAt");
+
+            entity.HasIndex(r => r.Rating)
+                  .HasDatabaseName("IX_Reviews_Rating");
+
+            entity.Property(r => r.Rating)
+                  .IsRequired();
+
+            entity.Property(r => r.Comment)
+                  .HasMaxLength(500);
+
+            entity.Property(r => r.Status)
+                  .IsRequired()
+                  .HasConversion<string>()
+                  .HasMaxLength(20)
+                  .HasDefaultValue(Entities.Enums.ReviewStatus.Normal);
+
+            entity.Property(r => r.ReviewerIp)
+                  .HasMaxLength(45);
+
+            entity.Property(r => r.IsFirstReview)
+                  .HasDefaultValue(false);
+
+            entity.Property(r => r.IsDeleted)
+                  .HasDefaultValue(false);
+
+            entity.Property(r => r.DeletionReason)
+                  .HasMaxLength(500);
+
+            entity.Property(r => r.FlagDetail)
+                  .HasMaxLength(500);
+
+            entity.Property(r => r.CreatedAt)
+                  .HasColumnType("timestamp").HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            entity.Property(r => r.UpdatedAt)
+                  .HasColumnType("timestamp").HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            entity.HasOne(r => r.Reservation)
+                  .WithMany()
+                  .HasForeignKey(r => r.ReservationId)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(r => r.Reviewer)
+                  .WithMany()
+                  .HasForeignKey(r => r.ReviewerId)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(r => r.Publisher)
+                  .WithMany()
+                  .HasForeignKey(r => r.PublisherId)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasOne(r => r.SharePost)
+                  .WithMany()
+                  .HasForeignKey(r => r.SharePostId)
+                  .OnDelete(DeleteBehavior.Restrict);
+
+            entity.HasQueryFilter(r => !r.IsDeleted);
+        });
+
+        modelBuilder.Entity<PublisherReputation>(entity =>
+        {
+            entity.HasKey(pr => pr.Id);
+
+            entity.HasIndex(pr => pr.PublisherId)
+                  .IsUnique()
+                  .HasDatabaseName("IX_PublisherReputations_PublisherId");
+
+            entity.HasIndex(pr => pr.ReputationScore)
+                  .HasDatabaseName("IX_PublisherReputations_ReputationScore");
+
+            entity.HasIndex(pr => pr.AverageRating)
+                  .HasDatabaseName("IX_PublisherReputations_AverageRating");
+
+            entity.HasIndex(pr => new { pr.ReputationScore, pr.TotalReviewCount })
+                  .HasDatabaseName("IX_PublisherReputations_Score_Count");
+
+            entity.Property(pr => pr.AverageRating)
+                  .IsRequired()
+                  .HasColumnType("decimal(3,2)");
+
+            entity.Property(pr => pr.ReputationScore)
+                  .IsRequired()
+                  .HasColumnType("decimal(5,2)");
+
+            entity.Property(pr => pr.LastReviewAt)
+                  .HasColumnType("timestamp").HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            entity.Property(pr => pr.CreatedAt)
+                  .HasColumnType("timestamp").HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            entity.Property(pr => pr.UpdatedAt)
+                  .HasColumnType("timestamp").HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+            entity.HasOne(pr => pr.Publisher)
+                  .WithMany()
+                  .HasForeignKey(pr => pr.PublisherId)
+                  .OnDelete(DeleteBehavior.Restrict);
+        });
     }
 
     public override int SaveChanges()
@@ -755,6 +886,7 @@ public class AppDbContext : DbContext
             FoodCategory fc => $"食物分类 #{fc.Id} - {fc.Name}",
             AllergenTag at => $"过敏原标签 #{at.Id} - {at.Name}",
             PostTag pt => $"帖子标签 #{pt.Id} - {pt.Name}",
+            Review r => $"评价 #{r.Id} - 用户#{r.ReviewerId}评发布者#{r.PublisherId}",
             _ => $"{entity.GetType().Name} #{entry.Property("Id").CurrentValue}"
         };
     }
@@ -770,6 +902,7 @@ public class AppDbContext : DbContext
             FoodCategory fc => null,
             AllergenTag at => null,
             PostTag pt => pt.CreatedBy,
+            Review r => r.ReviewerId,
             _ => null
         };
     }

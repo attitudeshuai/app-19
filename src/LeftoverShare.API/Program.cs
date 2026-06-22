@@ -161,6 +161,8 @@ builder.Services.AddScoped<IDeletedEntitySnapshotRepository, DeletedEntitySnapsh
 builder.Services.AddScoped<IFoodCategoryRepository, FoodCategoryRepository>();
 builder.Services.AddScoped<IAllergenTagRepository, AllergenTagRepository>();
 builder.Services.AddScoped<IPostTagRepository, PostTagRepository>();
+builder.Services.AddScoped<IReviewRepository, ReviewRepository>();
+builder.Services.AddScoped<IPublisherReputationRepository, PublisherReputationRepository>();
 
 // 注册 UnitOfWork
 builder.Services.AddScoped<IUnitOfWork, UnitOfWork>();
@@ -182,6 +184,7 @@ builder.Services.AddScoped<IHardCleanupService, HardCleanupService>();
 builder.Services.AddScoped<IFoodCategoryService, FoodCategoryService>();
 builder.Services.AddScoped<IAllergenTagService, AllergenTagService>();
 builder.Services.AddScoped<IPostTagService, PostTagService>();
+builder.Services.AddScoped<IReviewService, ReviewService>();
 
 // 注册定时任务后台服务
 builder.Services.AddHostedService<DailyCleanupScheduler>();

@@ -13,5 +13,7 @@ public interface IUnitOfWork
     IFoodCategoryRepository FoodCategories { get; }
     IAllergenTagRepository AllergenTags { get; }
     IPostTagRepository PostTags { get; }
+    IReviewRepository Reviews { get; }
+    IPublisherReputationRepository PublisherReputations { get; }
     Task<int> SaveChangesAsync();
 }

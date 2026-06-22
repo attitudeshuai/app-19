@@ -7,6 +7,7 @@ using LeftoverShare.API.DTOs.SharePosts;
 using LeftoverShare.API.DTOs.FoodCategories;
 using LeftoverShare.API.DTOs.AllergenTags;
 using LeftoverShare.API.DTOs.PostTags;
+using LeftoverShare.API.DTOs.Reviews;
 using LeftoverShare.API.Entities;
 using LeftoverShare.API.Helpers;
 using System.Text.Json;
@@ -104,6 +105,16 @@ public class MappingProfile : Profile
             .ForMember(dest => dest.CreatedByUsername, opt => opt.MapFrom(src => src.CreatedByUser != null ? src.CreatedByUser.Username : null));
         CreateMap<CreatePostTagRequest, PostTag>();
         CreateMap<UpdatePostTagRequest, PostTag>();
+
+        CreateMap<Review, ReviewResponse>()
+            .ForMember(dest => dest.ReviewerName, opt => opt.MapFrom(src => src.Reviewer != null ? src.Reviewer.Username : string.Empty))
+            .ForMember(dest => dest.PublisherName, opt => opt.MapFrom(src => src.Publisher != null ? src.Publisher.Username : string.Empty))
+            .ForMember(dest => dest.SharePostTitle, opt => opt.MapFrom(src => src.SharePost != null ? src.SharePost.Title : string.Empty))
+            .ForMember(dest => dest.Status, opt => opt.MapFrom(src => src.Status.ToString()));
+        CreateMap<CreateReviewRequest, Review>();
+
+        CreateMap<PublisherReputation, PublisherReputationResponse>()
+            .ForMember(dest => dest.PublisherName, opt => opt.MapFrom(src => src.Publisher != null ? src.Publisher.Username : string.Empty));
     }
 
     /// <summary>
